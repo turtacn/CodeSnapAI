@@ -457,19 +457,16 @@ Special thanks to all [contributors](https://github.com/turtacn/CodeSnapAI/graph
 1. **AI调试助手**: ChatDBG、Debug-gym等工具已实现AI与传统调试器(pdb/gdb/lldb)集成，支持交互式调试和根因分析
 
    - [Debug-gym: an environment for AI coding tools to learn how to debug code like programmers - Microsoft Research](https://www.microsoft.com/en-us/research/blog/debug-gym-an-environment-for-ai-coding-tools-to-learn-how-to-debug-code-like-programmers/)  
-
    - [GitHub - plasma-umass/ChatDBG: ChatDBG - AI-assisted debugging. Uses AI to answer 'why'](https://github.com/plasma-umass/ChatDBG) 
 
 2. **代码复杂度工具**: Codacy、SonarQube、NDepend等商业工具提供圈复杂度、认知复杂度等多维度分析
 
    - [Code Complexity: An In-Depth Explanation and Metrics](https://blog.codacy.com/code-complexity)  
-
    - [How to Measure Code Complexity - TIOBE](https://www.tiobe.com/knowledge/article/controlling-code-complexity/) 
 
 3. **通用AI代码助手**:  Workik、GitHub Copilot等提供上下文感知的错误检测和修复建议
 
    - [FREE AI-Powered Code Debugger; Context-Driven AI Debugging](https://workik.com/ai-code-debugger)  
-
    - [Top 10 Best AI Tools To Debug Code In 2025 (Faster & Smarter)](https://techcodingtravels.com/top-10-best-ai-tools-to-debug-code-in-2025/) 
 
 ---
@@ -477,4 +474,3 @@ Special thanks to all [contributors](https://github.com/turtacn/CodeSnapAI/graph
 <div align="center">
   <sub>Built with ❤️ by the open-source community</sub>
 </div>
-```
