@@ -11,7 +11,7 @@
   [![Coverage](https://img.shields.io/badge/coverage-95%25-green)](https://github.com/turtacn/CodeSnapAI)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
   
-  [English](README.md) | [简体中文](README-zh.md)
+  [English](README.md) | [简体中文](README-zh.md) | [总体设计](docs/architecture.md)
 </div>
 
 ---
