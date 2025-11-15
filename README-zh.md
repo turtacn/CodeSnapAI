@@ -1,16 +1,16 @@
 <div align="center">
   <img src="logo.png" alt="CodeSnapAI Logo" width="200" height="200">
-  
+
   # CodeSnapAI
-  
+
   **AI驱动的语义代码分析与智能治理平台**
-  
+
   [![构建状态](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/turtacn/CodeSnapAI)
   [![许可证](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
   [![Python版本](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
   [![覆盖率](https://img.shields.io/badge/coverage-95%25-green)](https://github.com/turtacn/CodeSnapAI)
   [![欢迎PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-  
+
   [English](README.md) | [简体中文](README-zh.md) | [总体设计](docs/architecture.md)
 </div>
 
@@ -39,11 +39,11 @@ CodeSnapAI 致力于解决现代软件工程中的关键难题："**上下文爆
 
 ### 竞争优势
 
-🚀 **20:1压缩比** - 业界领先的语义快照技术  
-🎯 **95%+信息保留率** - 保留所有调试关键关系  
-🔄 **闭环自动化** - 从问题检测到验证补丁部署  
-🌐 **通用语言支持** - 跨5+主流语言的统一分析  
-⚡ **30秒内分析** - 处理10万行代码项目仅需30秒  
+🚀 **20:1压缩比** - 业界领先的语义快照技术
+🎯 **95%+信息保留率** - 保留所有调试关键关系
+🔄 **闭环自动化** - 从问题检测到验证补丁部署
+🌐 **通用语言支持** - 跨5+主流语言的统一分析
+⚡ **30秒内分析** - 处理10万行代码项目仅需30秒
 🔓 **开源可扩展** - 支持自定义规则和语言的插件架构
 
 ---
@@ -200,7 +200,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: 安装CodeSnapAI
         run: pip install codesage
-      
+
       - name: 复杂度分析
         run: |
           codesage scan . --threshold cyclomatic=12 --output report.json
@@ -239,7 +239,7 @@ from codesage.plugins import LanguagePlugin
 class KotlinPlugin(LanguagePlugin):
     def get_tree_sitter_grammar(self):
         return 'tree-sitter-kotlin'
-    
+
     def extract_semantic_tags(self, node):
         # 自定义语义提取逻辑
         if node.type == 'coroutine_declaration':
@@ -279,7 +279,7 @@ codesage refactor ./services/payment.go --interactive
 # 🤖 我发现了3个复杂度问题。让我们从ProcessRefund开始：
 #    当前圈复杂度：18
 #    建议方法：提取重试逻辑和错误处理
-#    
+#
 # 👤 先关注重试逻辑
 # 🤖 生成补丁：[显示差异]
 #    测试：✅ 所有12个测试通过
@@ -452,18 +452,18 @@ CodeSnapAI基于以下优秀项目构建：
 
 1. **AI调试助手**: ChatDBG、Debug-gym等工具已实现AI与传统调试器(pdb/gdb/lldb)集成，支持交互式调试和根因分析
 
-   - [Debug-gym: an environment for AI coding tools to learn how to debug code like programmers - Microsoft Research](https://www.microsoft.com/en-us/research/blog/debug-gym-an-environment-for-ai-coding-tools-to-learn-how-to-debug-code-like-programmers/)  
-   - [GitHub - plasma-umass/ChatDBG: ChatDBG - AI-assisted debugging. Uses AI to answer 'why'](https://github.com/plasma-umass/ChatDBG) 
+   - [Debug-gym: an environment for AI coding tools to learn how to debug code like programmers - Microsoft Research](https://www.microsoft.com/en-us/research/blog/debug-gym-an-environment-for-ai-coding-tools-to-learn-how-to-debug-code-like-programmers/)
+   - [GitHub - plasma-umass/ChatDBG: ChatDBG - AI-assisted debugging. Uses AI to answer 'why'](https://github.com/plasma-umass/ChatDBG)
 
 2. **代码复杂度工具**: Codacy、SonarQube、NDepend等商业工具提供圈复杂度、认知复杂度等多维度分析
 
-   - [Code Complexity: An In-Depth Explanation and Metrics](https://blog.codacy.com/code-complexity)  
-   - [How to Measure Code Complexity - TIOBE](https://www.tiobe.com/knowledge/article/controlling-code-complexity/) 
+   - [Code Complexity: An In-Depth Explanation and Metrics](https://blog.codacy.com/code-complexity)
+   - [How to Measure Code Complexity - TIOBE](https://www.tiobe.com/knowledge/article/controlling-code-complexity/)
 
 3. **通用AI代码助手**:  Workik、GitHub Copilot等提供上下文感知的错误检测和修复建议
 
-   - [FREE AI-Powered Code Debugger; Context-Driven AI Debugging](https://workik.com/ai-code-debugger)  
-   - [Top 10 Best AI Tools To Debug Code In 2025 (Faster & Smarter)](https://techcodingtravels.com/top-10-best-ai-tools-to-debug-code-in-2025/) 
+   - [FREE AI-Powered Code Debugger; Context-Driven AI Debugging](https://workik.com/ai-code-debugger)
+   - [Top 10 Best AI Tools To Debug Code In 2025 (Faster & Smarter)](https://techcodingtravels.com/top-10-best-ai-tools-to-debug-code-in-2025/)
 
 ---
 

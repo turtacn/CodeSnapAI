@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "codesage"
+version = "0.1.0"
+description = "A tool for code analysis and risk assessment."
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+tree-sitter = ">=0.20.0"
+click = ">=8.1.0"
+pyyaml = ">=6.0"
+pytest = ">=7.0"
+structlog = ">=21.5.0"
+gitignore-parser = ">=0.1.8"
+
+
+[tool.poetry.dev-dependencies]
+black = ">=22.3.0"
+ruff = ">=0.0.275"
+pre-commit = ">=2.20.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+codesage = "codesage.cli.main:cli"

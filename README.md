@@ -1,126 +1,126 @@
 <div align="center">
   <img src="logo.png" alt="CodeSnapAI Logo" width="200" height="200">
-  
+
   # CodeSnapAI
-  
-  **AI-Powered Semantic Code Analysis & Intelligent Governance Platform**
-  
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/turtacn/CodeSnapAI)
-  [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-  [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-  [![Coverage](https://img.shields.io/badge/coverage-95%25-green)](https://github.com/turtacn/CodeSnapAI)
-  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-  
+
+  **AI驱动的语义代码分析与智能治理平台**
+
+  [![构建状态](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/turtacn/CodeSnapAI)
+  [![许可证](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+  [![Python版本](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+  [![覆盖率](https://img.shields.io/badge/coverage-95%25-green)](https://github.com/turtacn/CodeSnapAI)
+  [![欢迎PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
   [English](README.md) | [简体中文](README-zh.md) | [总体设计](docs/architecture.md)
 </div>
 
 ---
 
-## 🎯 Mission Statement
+## 🎯 核心使命
 
-CodeSnapAI addresses the critical "**context explosion vs. information loss**" paradox in modern software engineering. We compress massive codebases into ultra-compact semantic snapshots while preserving 95%+ debugging-critical information, enabling AI-assisted development at unprecedented scale.
+CodeSnapAI 致力于解决现代软件工程中的关键难题："**上下文爆炸与信息丢失**"的悖论。我们将海量代码库压缩为超紧凑的语义快照，同时保留95%以上的调试关键信息，使AI辅助开发达到前所未有的规模。
 
-**Core Innovation**: Transform 5MB+ codebases into <200KB semantic representations that LLMs can actually understand and act upon.
-
----
-
-## 💡 Why CodeSnapAI?
-
-### Industry Pain Points
-
-Modern software development faces **three critical bottlenecks**:
-
-| Challenge | Current State | CodeSnapAI Solution |
-|-----------|---------------|---------------------|
-| **Context Overload** | Large codebases contain millions of details, overwhelming AI debuggers and human developers | Intelligent semantic compression with risk-weighted preservation |
-| **Semantic Loss** | Traditional code summarization loses critical dependency relationships and error patterns | Multi-dimensional semantic tagging system maintaining architectural integrity |
-| **Governance Fragmentation** | Complexity detection tools (SonarQube, Codacy) report issues but require manual remediation | Automated end-to-end workflow: scan → AI-generated patches → validation → deployment |
-| **Multi-Language Chaos** | Each language requires separate toolchains and analysis frameworks | Unified semantic abstraction layer across Go, Java, C/C++, Rust, Python |
-
-### Competitive Advantages
-
-🚀 **20:1 Compression Ratio** - Industry-leading semantic snapshot technology  
-🎯 **95%+ Information Retention** - Preserves all debugging-critical relationships  
-🔄 **Closed-Loop Automation** - From issue detection to validated patch deployment  
-🌐 **Universal Language Support** - Unified analysis across 5+ major languages  
-⚡ **Sub-30s Analysis** - Process 100K LOC projects in under 30 seconds  
-🔓 **Open Source & Extensible** - Plugin architecture for custom rules and languages
+**核心创新**：将5MB+的代码库转化为<200KB的语义表示，让大语言模型真正理解并采取行动。
 
 ---
 
-## ✨ Key Features
+## 💡 为什么选择 CodeSnapAI？
 
-### 1. **Multi-Language Semantic Analyzer**
-- **Unified AST Parsing**: Leverages tree-sitter for Go, Java, C/C++, Rust, Python
-- **Deep Semantic Extraction**:
-  - Function signatures, call graphs, dependency trees
-  - Complexity metrics (cyclomatic, cognitive, nesting depth)
-  - Error handling patterns (panic/error wrapping/exceptions)
-  - Concurrency primitives (goroutines, async/await, channels)
-  - Database/network operation markers
-- **Incremental Analysis**: File-level hashing for efficient change detection
+### 行业痛点分析
 
-### 2. **Intelligent Snapshot Generator**
-- **Advanced Compression Strategies**:
-  - Package-level aggregation with representative sampling
-  - Critical path extraction (high-call-count functions prioritized)
-  - Semantic clustering by functional tags
-  - Risk-weighted pruning (high-risk modules preserved verbatim)
-- **Multiple Output Formats**: YAML (human-readable), JSON (API), Binary (performance)
-- **Rich Metadata**: Project structure, dependency graphs, risk heatmaps, git context
+现代软件开发面临**三大关键瓶颈**：
 
-### 3. **Risk Scoring Engine**
-- **Multi-Dimensional Risk Model**:
-  - Complexity score (weighted McCabe + Cognitive Complexity)
-  - Error pattern analysis (unsafe operations, missing handlers)
-  - Test coverage penalties for critical paths
-  - Transitive dependency vulnerability propagation
-  - Change frequency from git history (instability indicators)
-- **Configurable Thresholds**: Custom scoring rules per project type
-- **Actionable Reports**: Drill-down capabilities with root cause analysis
+| 挑战 | 现状 | CodeSnapAI解决方案 |
+|------|------|-------------------|
+| **上下文过载** | 大型代码库包含数百万个细节，压垮AI调试器和开发者 | 基于风险权重的智能语义压缩 |
+| **语义丢失** | 传统代码摘要丢失关键依赖关系和错误模式 | 多维度语义标签系统保持架构完整性 |
+| **治理碎片化** | 复杂度检测工具（SonarQube、Codacy）报告问题但需要人工修复 | 自动化端到端工作流：扫描 → AI生成补丁 → 验证 → 部署 |
+| **多语言混乱** | 每种语言需要独立的工具链和分析框架 | 跨Go、Java、C/C++、Rust、Python的统一语义抽象层 |
 
-### 4. **AI Governance Orchestrator**
-- **Automated Issue Detection**:
-  - Cyclomatic complexity > 10 (configurable)
-  - Cognitive complexity > 15
-  - Nesting depth > 4
-  - Function length > 50 LOC
-  - Parameter count > 5
-  - Code duplication > 3%
-- **LLM-Powered Refactoring**:
-  - Context-enriched prompt generation
-  - Structured JSON output validation
-  - Multi-turn conversation support
-- **Patch Management Pipeline**:
-  - Syntax validation via language parsers
-  - Automated test execution (pre/post patching)
-  - Git-based rollback mechanism
-  - Optional approval workflows
+### 竞争优势
 
-### 5. **Interactive Debugging Assistant**
-- **Natural Language Queries**:
-  - "Why did TestUserLogin fail?" → Full call chain localization
-  - "Show high-risk modules" → Ranked list with justifications
-  - "Explain function ProcessPayment" → Semantic summary + dependencies
-- **Debugger Integration**: Compatible with pdb, gdb, lldb, delve
-- **Real-Time Navigation**: Semantic search across codebase
+🚀 **20:1压缩比** - 业界领先的语义快照技术
+🎯 **95%+信息保留率** - 保留所有调试关键关系
+🔄 **闭环自动化** - 从问题检测到验证补丁部署
+🌐 **通用语言支持** - 跨5+主流语言的统一分析
+⚡ **30秒内分析** - 处理10万行代码项目仅需30秒
+🔓 **开源可扩展** - 支持自定义规则和语言的插件架构
 
 ---
 
-## 🚀 Getting Started
+## ✨ 核心特性
 
-### Prerequisites
-- Python 3.10 or higher
-- Git (for repository analysis features)
+### 1. **多语言语义分析器**
+- **统一AST解析**：基于tree-sitter支持Go、Java、C/C++、Rust、Python
+- **深度语义提取**：
+  - 函数签名、调用图、依赖树
+  - 复杂度指标（圈复杂度、认知复杂度、嵌套深度）
+  - 错误处理模式（panic/error包装/异常）
+  - 并发原语（goroutine、async/await、channel）
+  - 数据库/网络操作标记
+- **增量分析**：基于文件级哈希的高效变更检测
 
-### Installation
+### 2. **智能快照生成器**
+- **高级压缩策略**：
+  - 包级聚合与代表性采样
+  - 关键路径提取（高调用频次函数优先）
+  - 基于功能标签的语义聚类
+  - 风险加权剪枝（高风险模块完整保留）
+- **多种输出格式**：YAML（人类可读）、JSON（API）、二进制（性能）
+- **丰富元数据**：项目结构、依赖图、风险热图、Git上下文
 
-#### Via pip (Recommended)
+### 3. **风险评分引擎**
+- **多维度风险模型**：
+  - 复杂度评分（McCabe + 认知复杂度加权）
+  - 错误模式分析（不安全操作、缺失处理器）
+  - 关键路径测试覆盖率惩罚
+  - 传递性依赖漏洞传播
+  - Git历史变更频率（不稳定性指标）
+- **可配置阈值**：按项目类型自定义评分规则
+- **可操作报告**：根因分析与下钻能力
+
+### 4. **AI治理编排器**
+- **自动化问题检测**：
+  - 圈复杂度 > 10（可配置）
+  - 认知复杂度 > 15
+  - 嵌套深度 > 4
+  - 函数长度 > 50行
+  - 参数数量 > 5
+  - 代码重复率 > 3%
+- **LLM驱动重构**：
+  - 上下文丰富的提示生成
+  - 结构化JSON输出验证
+  - 多轮对话支持
+- **补丁管理流水线**：
+  - 通过语言解析器进行语法验证
+  - 自动化测试执行（补丁前后）
+  - 基于Git的回滚机制
+  - 可选审批工作流
+
+### 5. **交互式调试助手**
+- **自然语言查询**：
+  - "为什么TestUserLogin失败？" → 完整调用链定位
+  - "显示高风险模块" → 带理由的排序列表
+  - "解释ProcessPayment函数" → 语义摘要 + 依赖关系
+- **调试器集成**：兼容pdb、gdb、lldb、delve
+- **实时导航**：跨代码库的语义搜索
+
+---
+
+## 🚀 快速开始
+
+### 前置要求
+- Python 3.10或更高版本
+- Git（用于代码仓库分析功能）
+
+### 安装
+
+#### 通过pip安装（推荐）
 ```bash
 pip install codesage
 ````
 
-#### From Source
+#### 从源码安装
 
 ```bash
 git clone https://github.com/turtacn/CodeSnapAI.git
@@ -128,69 +128,69 @@ cd CodeSnapAI
 pip install -e .
 ```
 
-### Quick Start
+### 快速入门
 
-#### 1. Generate Semantic Snapshot
+#### 1. 生成语义快照
 
 ```bash
-# Analyze a Go microservice project
+# 分析Go微服务项目
 codesage snapshot ./my-go-service -o snapshot.yaml
 
-# Output: snapshot.yaml (compressed semantic representation)
+# 输出：snapshot.yaml（压缩的语义表示）
 ```
 
-#### 2. Analyze Architecture
+#### 2. 分析架构
 
 ```bash
 codesage analyze snapshot.yaml
 
-# Output example:
-# Project: my-go-service (Go 1.21)
-# Total Functions: 342
-# High-Risk Modules: 12 (see details below)
-# Top Complexity Hotspots:
-#   - handlers/auth.go::ValidateToken (Cyclomatic: 18, Cognitive: 24)
-#   - services/payment.go::ProcessRefund (Cyclomatic: 15, Cognitive: 21)
+# 输出示例：
+# 项目：my-go-service (Go 1.21)
+# 总函数数：342
+# 高风险模块：12（详见下方）
+# 复杂度热点：
+#   - handlers/auth.go::ValidateToken（圈复杂度：18，认知复杂度：24）
+#   - services/payment.go::ProcessRefund（圈复杂度：15，认知复杂度：21）
 ```
 
-#### 3. Debug Test Failures
+#### 3. 调试测试失败
 
 ```bash
 codesage debug snapshot.yaml TestUserRegistration
 
-# Output:
-# Test Failure Localization:
-# Root Cause: handlers/user.go::RegisterUser, Line 45
-# Call Chain: RegisterUser → ValidateEmail → CheckDuplicates
-# Risk Factors: Missing error handling for database timeout (Line 52)
-# Suggested Fix: Wrap db.Query with context.WithTimeout
+# 输出：
+# 测试失败定位：
+# 根因：handlers/user.go::RegisterUser，第45行
+# 调用链：RegisterUser → ValidateEmail → CheckDuplicates
+# 风险因素：数据库超时缺少错误处理（第52行）
+# 修复建议：使用context.WithTimeout包装db.Query
 ```
 
-#### 4. Complexity Governance Workflow
+#### 4. 复杂度治理工作流
 
 ```bash
-# Scan for complexity violations
+# 扫描复杂度违规
 codesage scan ./my-go-service --threshold cyclomatic=10 cognitive=15
 
-# Auto-generate refactoring with LLM
+# 使用LLM自动生成重构
 codesage govern scan_results.json --llm claude-3-5-sonnet --apply
 
-# Output:
-# Detected 8 violations
-# Generated 8 refactoring patches
-# Validation: 7/8 passed tests (1 requires manual review)
-# Applied patches to: handlers/auth.go, services/payment.go, ...
+# 输出：
+# 检测到8个违规
+# 生成8个重构补丁
+# 验证：7/8通过测试（1个需要人工审核）
+# 已应用补丁至：handlers/auth.go, services/payment.go, ...
 ```
 
 ---
 
-## 📊 Usage Examples
+## 📊 使用示例
 
-### Example 1: CI/CD Integration
+### 示例1：CI/CD集成
 
 ```yaml
 # .github/workflows/code-quality.yml
-name: Code Quality Gate
+name: 代码质量门禁
 on: [pull_request]
 
 jobs:
@@ -198,40 +198,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install CodeSnapAI
+      - name: 安装CodeSnapAI
         run: pip install codesage
-      
-      - name: Complexity Analysis
+
+      - name: 复杂度分析
         run: |
           codesage scan . --threshold cyclomatic=12 --output report.json
           codesage gate report.json --max-violations 5
 ```
 
-### Example 2: Python Library Usage
+### 示例2：Python库使用
 
 ```python
 from codesage import SemanticAnalyzer, SnapshotGenerator, RiskScorer
 
-# Initialize analyzer
+# 初始化分析器
 analyzer = SemanticAnalyzer(language='go')
 analysis = analyzer.analyze_directory('./my-service')
 
-# Generate snapshot
+# 生成快照
 generator = SnapshotGenerator(compression_ratio=20)
 snapshot = generator.create(analysis)
 snapshot.save('snapshot.yaml')
 
-# Risk scoring
+# 风险评分
 scorer = RiskScorer()
 risks = scorer.score(analysis)
-print(f"High-risk modules: {len(risks.high_risk)}")
+print(f"高风险模块数：{len(risks.high_risk)}")
 
 for module in risks.high_risk:
     print(f"  {module.path}: {module.score}/100")
-    print(f"    Reasons: {', '.join(module.risk_factors)}")
+    print(f"    原因：{', '.join(module.risk_factors)}")
 ```
 
-### Example 3: Custom Language Plugin
+### 示例3：自定义语言插件
 
 ```python
 from codesage.plugins import LanguagePlugin
@@ -239,91 +239,91 @@ from codesage.plugins import LanguagePlugin
 class KotlinPlugin(LanguagePlugin):
     def get_tree_sitter_grammar(self):
         return 'tree-sitter-kotlin'
-    
+
     def extract_semantic_tags(self, node):
-        # Custom semantic extraction logic
+        # 自定义语义提取逻辑
         if node.type == 'coroutine_declaration':
             return ['async', 'concurrency']
         return []
 
-# Register plugin
+# 注册插件
 from codesage import PluginRegistry
 PluginRegistry.register('kotlin', KotlinPlugin())
 ```
 
 ---
 
-## 🎬 Demo Scenarios
+## 🎬 演示场景
 
-### Scenario 1: Real-Time Complexity Monitoring
+### 场景1：实时复杂度监控
 
 ```bash
-# Watch mode for continuous analysis
+# 监视模式持续分析
 codesage watch ./src --alert-on complexity>15
 
-# Terminal output (with color-coded alerts):
-# ⚠️  ALERT: handlers/auth.go::ValidateToken
-#    Cognitive Complexity increased: 12 → 17 (+5)
-#    Recommendation: Extract validation logic to separate function
+# 终端输出（带颜色编码警报）：
+# ⚠️  警告：handlers/auth.go::ValidateToken
+#    认知复杂度增加：12 → 17 (+5)
+#    建议：将验证逻辑提取到独立函数
 ```
 
-**GIF Demo**: `docs/demos/complexity-monitoring.gif`
+**GIF演示**：`docs/demos/complexity-monitoring.gif`
 
-### Scenario 2: AI-Assisted Refactoring
+### 场景2：AI辅助重构
 
 ```bash
-# Interactive refactoring session
+# 交互式重构会话
 codesage refactor ./services/payment.go --interactive
 
-# LLM Conversation:
-# 🤖 I've identified 3 complexity issues. Let's start with ProcessRefund:
-#    Current Cyclomatic Complexity: 18
-#    Suggested approach: Extract retry logic and error handling
-#    
-# 👤 Focus on the retry logic first
-# 🤖 Generated patch: [shows diff]
-#    Tests: ✅ All 12 tests pass
-#    Apply this change? (y/n)
+# LLM对话：
+# 🤖 我发现了3个复杂度问题。让我们从ProcessRefund开始：
+#    当前圈复杂度：18
+#    建议方法：提取重试逻辑和错误处理
+#
+# 👤 先关注重试逻辑
+# 🤖 生成补丁：[显示差异]
+#    测试：✅ 所有12个测试通过
+#    应用此更改？(y/n)
 ```
 
-**GIF Demo**: `docs/demos/interactive-refactoring.gif`
+**GIF演示**：`docs/demos/interactive-refactoring.gif`
 
-### Scenario 3: Multi-Repository Dashboard
+### 场景3：多仓库仪表板
 
 ```bash
-# Analyze multiple projects
+# 分析多个项目
 codesage dashboard --repos "service-a,service-b,service-c" --port 8080
 
-# Opens web UI showing:
-# - Cross-project complexity trends
-# - Shared high-risk patterns
-# - Dependency vulnerability heatmap
+# 打开Web界面显示：
+# - 跨项目复杂度趋势
+# - 共享高风险模式
+# - 依赖漏洞热图
 ```
 
-**GIF Demo**: `docs/demos/multi-repo-dashboard.gif`
+**GIF演示**：`docs/demos/multi-repo-dashboard.gif`
 
 ---
 
-## 🛠️ Configuration
+## 🛠️ 配置
 
-### Project Profile (`.codesage.yaml`)
+### 项目配置文件（`.codesage.yaml`）
 
 ```yaml
 version: "1.0"
 
-# Language settings
+# 语言设置
 languages:
   - go
   - python
 
-# Compression settings
+# 压缩设置
 snapshot:
   compression_ratio: 20
   preserve_patterns:
-    - ".*_test.go$"  # Keep all test files
-    - "main.go$"     # Keep entry points
+    - ".*_test.go$"  # 保留所有测试文件
+    - "main.go$"     # 保留入口文件
 
-# Complexity thresholds
+# 复杂度阈值
 thresholds:
   cyclomatic_complexity: 10
   cognitive_complexity: 15
@@ -332,7 +332,7 @@ thresholds:
   parameter_count: 5
   duplication_rate: 0.03
 
-# Risk scoring weights
+# 风险评分权重
 risk_scoring:
   complexity_weight: 0.3
   error_pattern_weight: 0.25
@@ -340,9 +340,9 @@ risk_scoring:
   dependency_weight: 0.15
   change_frequency_weight: 0.1
 
-# LLM integration
+# LLM集成
 llm:
-  provider: anthropic  # or openai, local
+  provider: anthropic  # 或openai、local
   model: claude-3-5-sonnet-20241022
   temperature: 0.2
   max_tokens: 4096
@@ -350,67 +350,64 @@ llm:
 
 ---
 
-## 📚 Documentation
+## 📚 文档
 
-* [Architecture Overview](docs/architecture.md) - System design and component details
-* [API Reference](docs/api-reference.md) - Python library documentation
-* [Plugin Development](docs/plugin-development.md) - Create custom language analyzers
-* [Performance Tuning](docs/performance.md) - Optimization strategies for large codebases
-* [Governance Workflows](docs/governance-workflows.md) - Best practices for automated refactoring
+* [架构概览](docs/architecture.md) - 系统设计与组件详情
+* [API参考](docs/api-reference.md) - Python库文档
+* [插件开发](docs/plugin-development.md) - 创建自定义语言分析器
+* [性能调优](docs/performance.md) - 大型代码库优化策略
+* [治理工作流](docs/governance-workflows.md) - 自动化重构最佳实践
 
 ---
 
-## 🤝 Contributing
+## 🤝 贡献
 
-We welcome contributions from the community! CodeSnapAI is built on the principle that **better code analysis tools benefit everyone**.
+我们欢迎社区贡献！CodeSnapAI基于"**更好的代码分析工具惠及所有人**"的原则构建。
 
-### How to Contribute
+### 如何贡献
 
-1. **Fork the Repository**
+1. **Fork仓库**
 
    ```bash
    git clone https://github.com/turtacn/CodeSnapAI.git
    cd CodeSnapAI
    ```
 
-2. **Create a Feature Branch**
+2. **创建特性分支**
 
    ```bash
    git checkout -b feature/your-amazing-feature
    ```
 
-3. **Make Your Changes**
+3. **进行更改**
+   - 遵循我们的[代码风格指南](CONTRIBUTING.md#code-style)
+   - 为新功能添加测试
+   - 更新文档
 
-   * Follow our [Code Style Guide](CONTRIBUTING.md#code-style)
-   * Add tests for new features
-   * Update documentation
-
-4. **Run Tests**
-
+4. **运行测试**
    ```bash
    pytest tests/ --cov=codesage
-   ```
 
-5. **Submit a Pull Request**
+5. **提交拉取请求**
 
-   * Use our [PR template](.github/PULL_REQUEST_TEMPLATE.md)
-   * Link related issues
+   * 使用我们的[PR模板](.github/PULL_REQUEST_TEMPLATE.md)
+   * 链接相关issue
 
-### Contribution Areas
+### 贡献领域
 
-* 🌐 **Language Support**: Add parsers for new languages (Scala, Swift, etc.)
-* 📊 **Metrics**: Implement new complexity or quality metrics
-* 🤖 **LLM Integrations**: Add support for new AI models
-* 📝 **Documentation**: Improve guides and examples
-* 🐛 **Bug Fixes**: Help us squash bugs
+* 🌐 **语言支持**：添加新语言解析器（Scala、Swift等）
+* 📊 **指标**：实现新的复杂度或质量指标
+* 🤖 **LLM集成**：添加对新AI模型的支持
+* 📝 **文档**：改进指南和示例
+* 🐛 **Bug修复**：帮助我们消灭bug
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+详细指南请参阅[CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
-## 📄 License
+## 📄 许可证
 
-CodeSnapAI is released under the [Apache License 2.0](LICENSE).
+CodeSnapAI基于[Apache License 2.0](LICENSE)发布。
 
 ```
 Copyright 2024 CodeSnapAI Contributors
@@ -430,47 +427,46 @@ limitations under the License.
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 致谢
 
-CodeSnapAI builds upon the excellent work of:
+CodeSnapAI基于以下优秀项目构建：
 
-* [tree-sitter](https://tree-sitter.github.io/) - Incremental parsing system
-* [Anthropic Claude](https://www.anthropic.com/) - Advanced language model capabilities
-* [FastAPI](https://fastapi.tiangolo.com/) - Modern API framework
+* [tree-sitter](https://tree-sitter.github.io/) - 增量解析系统
+* [Anthropic Claude](https://www.anthropic.com/) - 先进的语言模型能力
+* [FastAPI](https://fastapi.tiangolo.com/) - 现代API框架
 
-Special thanks to all [contributors](https://github.com/turtacn/CodeSnapAI/graphs/contributors) who make this project possible.
-
----
-
-## 📞 Support & Community
-
-* 💬 **Discussions**: [GitHub Discussions](https://github.com/turtacn/CodeSnapAI/discussions)
-* 🐛 **Bug Reports**: [Issue Tracker](https://github.com/turtacn/CodeSnapAI/issues)
-* 📧 **Email**: [codesnapai@example.com](mailto:codesnapai@example.com)
-* 🐦 **Twitter**: [@CodeSnapAI](https://twitter.com/CodeSnapAI)
-
+特别感谢所有[贡献者](https://github.com/turtacn/CodeSnapAI/graphs/contributors)让这个项目成为可能。
 
 ---
 
-## References
+## 📞 支持与社区
+
+* 💬 **讨论区**：[GitHub Discussions](https://github.com/turtacn/CodeSnapAI/discussions)
+* 🐛 **Bug报告**：[Issue追踪器](https://github.com/turtacn/CodeSnapAI/issues)
+* 📧 **邮箱**：[codesnapai@example.com](mailto:codesnapai@example.com)
+* 🐦 **Twitter**：[@CodeSnapAI](https://twitter.com/CodeSnapAI)
+
+---
+
+## 参考
 
 1. **AI调试助手**: ChatDBG、Debug-gym等工具已实现AI与传统调试器(pdb/gdb/lldb)集成，支持交互式调试和根因分析
 
-   - [Debug-gym: an environment for AI coding tools to learn how to debug code like programmers - Microsoft Research](https://www.microsoft.com/en-us/research/blog/debug-gym-an-environment-for-ai-coding-tools-to-learn-how-to-debug-code-like-programmers/)  
-   - [GitHub - plasma-umass/ChatDBG: ChatDBG - AI-assisted debugging. Uses AI to answer 'why'](https://github.com/plasma-umass/ChatDBG) 
+   - [Debug-gym: an environment for AI coding tools to learn how to debug code like programmers - Microsoft Research](https://www.microsoft.com/en-us/research/blog/debug-gym-an-environment-for-ai-coding-tools-to-learn-how-to-debug-code-like-programmers/)
+   - [GitHub - plasma-umass/ChatDBG: ChatDBG - AI-assisted debugging. Uses AI to answer 'why'](https://github.com/plasma-umass/ChatDBG)
 
 2. **代码复杂度工具**: Codacy、SonarQube、NDepend等商业工具提供圈复杂度、认知复杂度等多维度分析
 
-   - [Code Complexity: An In-Depth Explanation and Metrics](https://blog.codacy.com/code-complexity)  
-   - [How to Measure Code Complexity - TIOBE](https://www.tiobe.com/knowledge/article/controlling-code-complexity/) 
+   - [Code Complexity: An In-Depth Explanation and Metrics](https://blog.codacy.com/code-complexity)
+   - [How to Measure Code Complexity - TIOBE](https://www.tiobe.com/knowledge/article/controlling-code-complexity/)
 
 3. **通用AI代码助手**:  Workik、GitHub Copilot等提供上下文感知的错误检测和修复建议
 
-   - [FREE AI-Powered Code Debugger; Context-Driven AI Debugging](https://workik.com/ai-code-debugger)  
-   - [Top 10 Best AI Tools To Debug Code In 2025 (Faster & Smarter)](https://techcodingtravels.com/top-10-best-ai-tools-to-debug-code-in-2025/) 
+   - [FREE AI-Powered Code Debugger; Context-Driven AI Debugging](https://workik.com/ai-code-debugger)
+   - [Top 10 Best AI Tools To Debug Code In 2025 (Faster & Smarter)](https://techcodingtravels.com/top-10-best-ai-tools-to-debug-code-in-2025/)
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by the open-source community</sub>
+  <sub>用❤️由开源社区构建</sub>
 </div>
