@@ -9,10 +9,15 @@ def test_snapshot_create(mock_manager):
     instance = mock_manager.return_value
     instance.save_snapshot.return_value = ".codesage/snapshots/v1.json"
 
-    result = runner.invoke(main, ['snapshot', 'create'])
+    with runner.isolated_filesystem():
+        # Create a dummy directory to snapshot
+        import os
+        os.makedirs("test_project")
 
-    assert result.exit_code == 0
-    assert "Snapshot saved to .codesage/snapshots/v1.json" in result.output
+        result = runner.invoke(main, ['snapshot', 'create', 'test_project'])
+
+        assert result.exit_code == 0
+        assert "Snapshot created at .codesage/snapshots/v1.json" in result.output
 
 @patch('codesage.cli.commands.snapshot.SnapshotVersionManager')
 def test_snapshot_list(mock_manager):

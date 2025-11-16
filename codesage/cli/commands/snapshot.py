@@ -19,41 +19,43 @@ def snapshot():
     pass
 
 @snapshot.command('create')
-@click.option('--format', '-f', type=click.Choice(['json', 'markdown', 'yaml']), default='json', help='Snapshot format.')
-@click.option('--compress', is_flag=True, help='Enable compression.')
-def create(format, compress):
-    """Create a new snapshot."""
-    # TODO: This will be replaced by a call to the analyze command's logic
-    from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata
-    from datetime import datetime
-
+@click.argument('path', type=click.Path(exists=True, dir_okay=True))
+@click.option('--format', '-f', type=click.Choice(['json', 'yaml']), default='json', help='Snapshot format.')
+@click.pass_context
+def create(ctx, path, format):
+    """Create a new snapshot from the given path."""
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
 
-    # Create a dummy snapshot for now.
-    # This will be replaced by a call to the analyze command's logic
+    # This would be a more complex operation in a real application,
+    # involving the analyzer and other components.
+    # For now, we'll just create a basic snapshot.
     from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata, DependencyGraph
     from datetime import datetime
     from codesage import __version__ as tool_version
+    import os
+
+    files = [os.path.join(dp, f) for dp, dn, fn in os.walk(path) for f in fn]
+    total_size = sum(os.path.getsize(f) for f in files)
 
     snapshot_data = ProjectSnapshot(
         metadata=SnapshotMetadata(
-            version="",
+            version="", # Will be set by the manager
             timestamp=datetime.now(),
-            project_name="my-project",
-            file_count=0,
-            total_size=0,
+            project_name=os.path.basename(os.path.abspath(path)),
+            file_count=len(files),
+            total_size=total_size,
             tool_version=tool_version,
-            config_hash="dummy_hash"
+            config_hash="not_implemented"
         ),
-        files=[],
+        files=files,
         global_metrics={},
-        dependency_graph=DependencyGraph(),
+        dependency_graph=DependencyGraph(nodes=[], links=[]),
         detected_patterns=[],
         issues=[]
     )
 
-    path = manager.save_snapshot(snapshot_data, format)
-    click.echo(f"Snapshot saved to {path}")
+    saved_path = manager.save_snapshot(snapshot_data, format)
+    click.echo(f"Snapshot created at {saved_path}")
 
 @snapshot.command('list')
 def list_snapshots():

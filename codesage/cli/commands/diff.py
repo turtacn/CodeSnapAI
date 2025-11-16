@@ -39,8 +39,20 @@ def diff(version1, version2, output, format):
     diff_data = differ.diff(snapshot1, snapshot2)
 
     if output:
-        # TODO: Implement file output
-        click.echo(f"Diff report will be saved to {output} in {format} format.")
+        if format == 'json':
+            import json
+            with open(output, 'w') as f:
+                f.write(diff_data.model_dump_json(indent=2))
+        elif format == 'markdown':
+            # This is a placeholder for a more sophisticated markdown report
+            with open(output, 'w') as f:
+                f.write(f"# Snapshot Diff Report: {version1} vs {version2}\n\n")
+                f.write(f"## Summary\n")
+                f.write(f"- **Added files**: {len(diff_data.added_files)}\n")
+                f.write(f"- **Removed files**: {len(diff_data.removed_files)}\n")
+                f.write(f"- **Modified files**: {len(diff_data.modified_files)}\n")
+        click.echo(f"Diff report saved to {output}")
+        return
 
     click.echo(f"Comparing {version1} and {version2}:")
     click.echo(f"  Added files: {len(diff_data.added_files)}")
