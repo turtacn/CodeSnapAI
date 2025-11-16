@@ -39,7 +39,7 @@ def analyze(path, language, exclude, output, format, no_progress):
 
     for file_path in files_to_analyze:
         # TODO: Add progress bar here.
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             source_code = f.read()
 
         parser.parse(source_code)
@@ -47,7 +47,7 @@ def analyze(path, language, exclude, output, format, no_progress):
         imports = parser.extract_imports()
 
         click.echo(f"File: {file_path}")
-        click.echo(f"  Imports: {[i.name for i in imports]}")
+        click.echo(f"  Imports: {[i.path for i in imports]}")
         click.echo(f"  Functions: {[f.name for f in functions]}")
 
 if __name__ == '__main__':
