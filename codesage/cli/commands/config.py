@@ -13,25 +13,24 @@ def config():
 from codesage.cli.interactive import run_wizard
 
 @config.command('init')
-@click.option('--interactive', '-i', is_flag=True, help='Run the interactive configuration wizard.')
-@click.option('--force', is_flag=True, help='Overwrite an existing configuration file.')
-def init(interactive, force):
+def init():
     """Initialize a new configuration file."""
-    if os.path.exists(USER_CONFIG_PATH) and not force:
-        click.echo(f"Configuration file already exists at {USER_CONFIG_PATH}", err=True)
-        click.echo("Use --force to overwrite.")
-        return
+    if os.path.exists(USER_CONFIG_PATH):
+        overwrite = click.confirm(
+            f"Configuration file already exists at {USER_CONFIG_PATH}. Overwrite?",
+            default=False
+        )
+        if not overwrite:
+            click.echo("Initialization cancelled.")
+            return
 
-    if interactive:
-        run_wizard()
-    else:
-        with open(DEFAULT_CONFIG_PATH, 'r') as f:
-            default_config = f.read()
+    with open(DEFAULT_CONFIG_PATH, 'r') as f:
+        default_config = f.read()
 
-        with open(USER_CONFIG_PATH, 'w') as f:
-            f.write(default_config)
+    with open(USER_CONFIG_PATH, 'w') as f:
+        f.write(default_config)
 
-        click.echo(f"Configuration file created at {USER_CONFIG_PATH}")
+    click.echo(f"Configuration file created at {USER_CONFIG_PATH}")
 
 @config.command('validate')
 def validate():

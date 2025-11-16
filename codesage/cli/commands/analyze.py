@@ -39,7 +39,7 @@ def analyze(path, language, exclude, output, format, no_progress):
 
     for file_path in files_to_analyze:
         # TODO: Add progress bar here.
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             source_code = f.read()
 
         parser.parse(source_code)
