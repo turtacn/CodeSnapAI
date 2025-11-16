@@ -19,6 +19,8 @@ jsonschema = "^4.25.1"
 jinja2 = "^3.1.6"
 pygments = "^2.19.2"
 networkx = ">=2.5,<3.0"
+questionary = "^2.0.1"
+rich = "^13.7.1"
 
 
 [tool.poetry.dev-dependencies]
@@ -31,4 +33,4 @@ requires = ["poetry-core>=1.0.0"                                                
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-codesage = "codesage.cli.main:cli"
+codesage = "codesage.cli.main:main"

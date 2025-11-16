@@ -1,0 +1,30 @@
+# Default configuration for CodeSage
+cli:
+  progress_bar: true
+  color_output: true
+  log_level: "info"
+  output_format: "table"  # table, json, plain
+  plugins_dir: ".codesage/plugins"
+
+analysis:
+  languages:
+    - python
+    - go
+  exclude:
+    - ".*"
+    - "node_modules"
+    - "vendor"
+  complexity_thresholds:
+    low: 5
+    medium: 10
+    high: 20
+
+snapshot:
+  formats:
+    - json
+    - markdown
+  compression:
+    enabled: true
+  versioning:
+    max_versions: 10
+    retention_days: 30

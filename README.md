@@ -125,8 +125,23 @@ pip install codesage
 ```bash
 git clone https://github.com/turtacn/CodeSnapAI.git
 cd CodeSnapAI
-pip install -e .
+poetry install
 ```
+
+### Quick Start (CLI)
+
+1.  **Initialize Configuration**:
+    ```bash
+    poetry run codesage config init --interactive
+    ```
+2.  **Analyze Your Code**:
+    ```bash
+    poetry run codesage analyze ./your-project
+    ```
+3.  **Create a Snapshot**:
+    ```bash
+    poetry run codesage snapshot create
+    ```
 
 ### Quick Start
 
