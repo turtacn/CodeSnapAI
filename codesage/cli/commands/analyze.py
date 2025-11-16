@@ -1,6 +1,18 @@
 import click
 import os
+import fnmatch
 from codesage.analyzers.parser_factory import create_parser
+
+LANGUAGE_EXTENSIONS = {
+    "python": {".py", ".pyw"},
+    "go": {".go"},
+}
+
+DEFAULT_EXCLUDE_DIRS = {
+    ".git", ".svn", ".hg", "CVS",
+    ".vscode", ".idea",
+    "__pycache__", "node_modules", "vendor", "dist", "build", "target",
+}
 
 @click.command()
 @click.argument('path', type=click.Path(exists=True, file_okay=True, dir_okay=True, readable=True))
@@ -17,15 +29,28 @@ def analyze(path, language, exclude, output, format, no_progress):
         files_to_analyze = [path]
     else:
         files_to_analyze = []
-        for root, _, files in os.walk(path):
+        exclude_patterns = list(exclude)
+
+        for root, dirs, files in os.walk(path, topdown=True):
+            dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
+
             for file in files:
-                files_to_analyze.append(os.path.join(root, file))
+                file_path = os.path.join(root, file)
+
+                if any(fnmatch.fnmatch(file_path, pattern) for pattern in exclude_patterns):
+                    continue
+
+                if language:
+                    allowed_extensions = LANGUAGE_EXTENSIONS.get(language, set())
+                    if not any(file.endswith(ext) for ext in allowed_extensions):
+                        continue
+
+                files_to_analyze.append(file_path)
 
     if not language:
-        # Simple auto-detection for now.
-        if files_to_analyze[0].endswith('.py'):
+        if files_to_analyze and files_to_analyze[0].endswith('.py'):
             language = 'python'
-        elif files_to_analyze[0].endswith('.go'):
+        elif files_to_analyze and files_to_analyze[0].endswith('.go'):
             language = 'go'
         else:
             click.echo("Could not determine language. Please specify with --language.", err=True)
@@ -38,16 +63,20 @@ def analyze(path, language, exclude, output, format, no_progress):
         return
 
     for file_path in files_to_analyze:
-        # TODO: Add progress bar here.
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             source_code = f.read()
 
         parser.parse(source_code)
+
+        if parser.tree and parser.tree.root_node.has_error:
+            click.echo(f"Warning: Skipping file {file_path} due to syntax errors.", err=True)
+            continue
+
         functions = parser.extract_functions()
         imports = parser.extract_imports()
 
         click.echo(f"File: {file_path}")
-        click.echo(f"  Imports: {[i.name for i in imports]}")
+        click.echo(f"  Imports: {[i.path for i in imports]}")
         click.echo(f"  Functions: {[f.name for f in functions]}")
 
 if __name__ == '__main__':
