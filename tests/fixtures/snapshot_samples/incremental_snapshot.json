@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "version": "v2",
+    "timestamp": "2023-10-27T11:00:00Z",
+    "git_commit": "f5g6h7i8",
+    "tool_version": "0.1.0",
+    "config_hash": "e5d6f7g8"
+  },
+  "files": [
+    {
+      "path": "src/main.py",
+      "language": "python",
+      "hash": "n5o6p7q8",
+      "lines": 155,
+      "ast_summary": {
+        "function_count": 5,
+        "class_count": 2,
+        "import_count": 11,
+        "comment_lines": 22
+      },
+      "complexity_metrics": { "cyclomatic": 18 },
+      "detected_patterns": [],
+      "issues": []
+    },
+    {
+      "path": "src/utils.py",
+      "language": "python",
+      "hash": "r8s9t0u1",
+      "lines": 50,
+      "ast_summary": {
+        "function_count": 2,
+        "class_count": 0,
+        "import_count": 3,
+        "comment_lines": 5
+      },
+      "complexity_metrics": { "cyclomatic": 5 },
+      "detected_patterns": [],
+      "issues": []
+    }
+  ],
+  "global_metrics": {
+    "total_lines": 205,
+    "total_files": 2,
+    "language_distribution": { "python": 2 },
+    "avg_complexity": 11.5
+  },
+  "dependency_graph": { "nodes": [], "edges": [] },
+  "detected_patterns": [],
+  "issues": []
+}

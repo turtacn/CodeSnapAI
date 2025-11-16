@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "version": "v1",
+    "timestamp": "2023-10-27T10:00:00Z",
+    "git_commit": "a1b2c3d4",
+    "tool_version": "0.1.0",
+    "config_hash": "e5d6f7g8"
+  },
+  "files": [
+    {
+      "path": "src/main.py",
+      "language": "python",
+      "hash": "h1i2j3k4",
+      "lines": 150,
+      "ast_summary": {
+        "function_count": 5,
+        "class_count": 2,
+        "import_count": 10,
+        "comment_lines": 20
+      },
+      "complexity_metrics": { "cyclomatic": 15 },
+      "detected_patterns": [],
+      "issues": []
+    }
+  ],
+  "global_metrics": {
+    "total_lines": 150,
+    "total_files": 1,
+    "language_distribution": { "python": 1 },
+    "avg_complexity": 15.0
+  },
+  "dependency_graph": { "nodes": [], "edges": [] },
+  "detected_patterns": [],
+  "issues": []
+}

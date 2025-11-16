@@ -1,0 +1,52 @@
+# CodeSage Analysis Report
+
+**Generated:** {{ snapshot.metadata.timestamp }}
+**Version:** {{ snapshot.metadata.version }}
+**Git Commit:** {{ snapshot.metadata.git_commit or 'N/A' }}
+
+---
+
+## 📊 Project Overview
+
+| Metric                | Value                                       |
+|-----------------------|---------------------------------------------|
+| Total Files           | {{ snapshot.files|length }}                 |
+| Total Lines of Code   | {{ snapshot.global_metrics.total_lines }}  |
+| Languages             | {{ snapshot.global_metrics.language_distribution.keys()|join(', ') }} |
+| Average Complexity    | {{ "%.2f"|format(snapshot.global_metrics.avg_complexity) }} |
+
+---
+
+{% include 'complexity_section.md.jinja2' %}
+
+---
+
+{% include 'dependency_section.md.jinja2' %}
+
+---
+
+## 🎨 Detected Patterns
+
+{% if snapshot.detected_patterns %}
+| Pattern Type | Occurrences |
+|--------------|-------------|
+{% for pattern in snapshot.detected_patterns %}
+| {{ pattern.type }} | {{ pattern.count }} |
+{% endfor %}
+{% else %}
+No design patterns were detected.
+{% endif %}
+
+---
+
+## ⚠️ Issues
+
+{% if snapshot.issues %}
+| Severity  | Message                                | Location                               |
+|-----------|----------------------------------------|----------------------------------------|
+{% for issue in snapshot.issues|sort(attribute='severity', reverse=True) %}
+| {{ issue.severity|upper }} | {{ issue.message }} | `{{ issue.location.file }}:{{ issue.location.line }}` |
+{% endfor %}
+{% else %}
+No issues were found.
+{% endif %}

@@ -45,9 +45,9 @@ def test_extract_imports_go(go_parser, sample_go_code):
     go_parser.parse(sample_go_code)
     imports = go_parser.extract_imports()
     assert len(imports) == 3
-    assert imports[0].module == 'encoding/json'
-    assert imports[1].module == 'fmt'
-    assert imports[2].module == 'net/http'
+    assert imports[0].path == 'encoding/json'
+    assert imports[1].path == 'fmt'
+    assert imports[2].path == 'net/http'
 
 def test_extract_interface_go(go_parser, sample_go_code):
     go_parser.parse(sample_go_code)

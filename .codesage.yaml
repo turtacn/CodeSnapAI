@@ -26,3 +26,18 @@ analyzers:
     detect_cycles: true
   patterns:
     enabled_rules: ["singleton", "factory", "god_class"]
+
+snapshot:
+  output_dir: ".codesage/snapshots"
+  formats: ["json", "markdown"]
+  compression:
+    enabled: true
+    exclude_patterns: ["*.test.go", "*_test.py"]
+  versioning:
+    enabled: true
+    max_versions: 10
+    retention_days: 30
+  markdown:
+    template: "default_report"
+    include_source_code: false
+    max_code_lines: 20

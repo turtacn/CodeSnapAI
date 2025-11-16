@@ -61,6 +61,7 @@ class PythonParser(BaseParser):
                             base_classes.append(self._text(child))
 
                 classes.append(ClassNode(
+                    node_type="class",
                     name=self._text(name_node) if name_node else '',
                     methods=methods,
                     base_classes=base_classes
@@ -78,7 +79,8 @@ class PythonParser(BaseParser):
                     if name.type == "dotted_name":
                         alias_node = name.parent.child_by_field_name('alias')
                         imports.append(ImportNode(
-                            module=self._text(name),
+                            node_type="import",
+                            path=self._text(name),
                             alias=self._text(alias_node) if alias_node else None,
                         ))
 
@@ -90,7 +92,8 @@ class PythonParser(BaseParser):
                         if name.type == "dotted_name":
                             alias_node = name.parent.child_by_field_name('alias')
                             imports.append(ImportNode(
-                                module=f"{module_name}.{self._text(name)}",
+                                node_type="import",
+                                path=f"{module_name}.{self._text(name)}",
                                 alias=self._text(alias_node) if alias_node else None,
                                 is_relative='.' in module_name
                             ))
@@ -119,6 +122,7 @@ class PythonParser(BaseParser):
                 return_type = f"-> {type_text}"
 
         return FunctionNode(
+            node_type="function",
             name=self._text(name_node) if name_node else '',
             params=[self._text(param) for param in params_node.children] if params_node else [],
             return_type=return_type,

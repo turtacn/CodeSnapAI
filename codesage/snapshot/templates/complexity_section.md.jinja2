@@ -1,0 +1,13 @@
+## 🔥 Complexity Hotspots
+
+_Top 10 most complex functions_
+
+{% if complexity_top10 %}
+| Rank | Function Name | Complexity | Lines | Location |
+|------|---------------|------------|-------|----------|
+{% for func in complexity_top10 %}
+| {{ loop.index }} | `{{ func.name }}` | **{{ func.complexity }}** | {{ func.lines }} | `{{ func.file }}:{{ func.line }}` |
+{% endfor %}
+{% else %}
+No complex functions were identified.
+{% endif %}

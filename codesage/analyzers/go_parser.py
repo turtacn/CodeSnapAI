@@ -1,8 +1,10 @@
 from tree_sitter import Language, Parser
 import tree_sitter_go as tsgo
+from typing import List
+
 from codesage.analyzers.base import BaseParser
 from codesage.analyzers.ast_models import FunctionNode, ImportNode, ClassNode
-from typing import List
+
 
 GO_COMPLEXITY_NODES = {
     "if_statement",
@@ -18,6 +20,7 @@ GO_CASE_NODES = {
     "default_case",
 }
 
+
 class GoParser(BaseParser):
     def __init__(self):
         super().__init__()
@@ -27,6 +30,9 @@ class GoParser(BaseParser):
     def _parse(self, source_code: bytes):
         return self.parser.parse(source_code)
 
+    # ----------------------------------------------------------------------
+    # Function extraction
+    # ----------------------------------------------------------------------
     def extract_functions(self) -> List[FunctionNode]:
         functions = []
         if not self.tree:
@@ -38,6 +44,9 @@ class GoParser(BaseParser):
 
         return functions
 
+    # ----------------------------------------------------------------------
+    # Interface extraction
+    # ----------------------------------------------------------------------
     def extract_interfaces(self) -> List[ClassNode]:
         interfaces = []
         if not self.tree:
@@ -53,42 +62,38 @@ class GoParser(BaseParser):
                 interface_name = self._text(name_node)
                 methods = self._extract_interface_methods(type_node)
 
-                interfaces.append(ClassNode(
-                    name=interface_name,
-                    methods=methods,
-                    base_classes=[],
-                ))
+                interfaces.append(
+                    ClassNode(
+                        node_type="interface",
+                        name=interface_name,
+                        methods=methods,
+                        base_classes=[],
+                    )
+                )
+
         return interfaces
 
     def _extract_interface_methods(self, interface_type_node):
         methods = []
         for child in interface_type_node.children:
-            if child.type != "field_declaration_list":
-                continue
+            if child.type == "method_elem":
+                name_node = child.child_by_field_name("name")
+                if name_node is None:
+                    for c in child.children:
+                        if c.type in ("field_identifier", "identifier"):
+                            name_node = c
+                            break
 
-            for field in child.children:
-                if field.type != "field_declaration":
-                    continue
-
-                method_spec = None
-                for c in field.children:
-                    if c.type == "method_spec":
-                        method_spec = c
-                        break
-
-                if method_spec is None:
-                    continue
-
-                name_node = method_spec.child_by_field_name("name")
                 method_name = self._text(name_node) if name_node else "<anonymous>"
 
                 methods.append(
                     FunctionNode(
+                        node_type="function",
                         name=method_name,
                         params=[],
                         return_type=None,
-                        start_line=method_spec.start_point[0],
-                        end_line=method_spec.end_point[0],
+                        start_line=child.start_point[0],
+                        end_line=child.end_point[0],
                         complexity=1,
                         is_async=False,
                         decorators=[],
@@ -96,6 +101,9 @@ class GoParser(BaseParser):
                 )
         return methods
 
+    # ----------------------------------------------------------------------
+    # Imports
+    # ----------------------------------------------------------------------
     def extract_imports(self) -> List[ImportNode]:
         imports = []
         if not self.tree:
@@ -105,12 +113,18 @@ class GoParser(BaseParser):
             if node.type == "import_spec":
                 path_node = node.child_by_field_name('path')
                 alias_node = node.child_by_field_name('alias')
-                imports.append(ImportNode(
-                    module=self._text(path_node).strip('"') if path_node else '',
-                    alias=self._text(alias_node) if alias_node else None
-                ))
+                imports.append(
+                    ImportNode(
+                        node_type="import",
+                        path=self._text(path_node).strip('"') if path_node else '',
+                        alias=self._text(alias_node) if alias_node else None
+                    )
+                )
         return imports
 
+    # ----------------------------------------------------------------------
+    # FunctionNode builder
+    # ----------------------------------------------------------------------
     def _build_function_node(self, func_node):
         name_node = func_node.child_by_field_name("name")
         params_node = func_node.child_by_field_name("parameters")
@@ -123,6 +137,7 @@ class GoParser(BaseParser):
                     params.append(self._text(param))
 
         return FunctionNode(
+            node_type="function",
             name=self._text(name_node) if name_node else '',
             params=params,
             return_type=self._text(return_type_node) if return_type_node else None,
@@ -133,6 +148,9 @@ class GoParser(BaseParser):
             decorators=[]
         )
 
+    # ----------------------------------------------------------------------
+    # Cyclomatic Complexity
+    # ----------------------------------------------------------------------
     def calculate_complexity(self, node) -> int:
         complexity = 1
 
