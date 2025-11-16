@@ -16,7 +16,8 @@ def project_snapshot():
     """Provides a ProjectSnapshot instance with various files for testing."""
     return ProjectSnapshot(
         metadata=SnapshotMetadata(
-            version="v1", timestamp=datetime.now(), tool_version="0.1.0", config_hash="abc"
+            version="v1", timestamp=datetime.now(), tool_version="0.1.0", config_hash="abc",
+            project_name="test_project", file_count=3, total_size=1650
         ),
         files=[
             FileSnapshot(

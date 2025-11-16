@@ -49,6 +49,9 @@ class SnapshotMetadata(BaseModel):
     """Metadata associated with a project snapshot."""
     version: str = Field(..., description="The version of the snapshot (e.g., 'v1', 'v2').")
     timestamp: datetime = Field(..., description="The timestamp when the snapshot was created.")
+    project_name: str = Field(..., description="The name of the project.")
+    file_count: int = Field(..., description="The number of files in the snapshot.")
+    total_size: int = Field(..., description="The total size of the files in the snapshot.")
     git_commit: Optional[str] = Field(None, description="The git commit hash when the snapshot was taken.")
     tool_version: str = Field(..., description="The version of the codesage tool.")
     config_hash: str = Field(..., description="The MD5 hash of the configuration file used for this snapshot.")

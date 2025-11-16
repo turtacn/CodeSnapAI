@@ -28,14 +28,19 @@ class GoParser(BaseParser):
         self.parser = Parser(go_language)
 
     def _parse(self, source_code: bytes):
-        return self.parser.parse(source_code)
+        try:
+            return self.parser.parse(source_code)
+        except Exception as e:
+            # TODO: Add logging here
+            print(f"Error parsing source code: {e}")
+            return None
 
     # ----------------------------------------------------------------------
     # Function extraction
     # ----------------------------------------------------------------------
     def extract_functions(self) -> List[FunctionNode]:
         functions = []
-        if not self.tree:
+        if not self.tree or not self.tree.root_node:
             return functions
 
         for node in self._walk(self.tree.root_node):
@@ -106,7 +111,7 @@ class GoParser(BaseParser):
     # ----------------------------------------------------------------------
     def extract_imports(self) -> List[ImportNode]:
         imports = []
-        if not self.tree:
+        if not self.tree or not self.tree.root_node:
             return imports
 
         for node in self._walk(self.tree.root_node):

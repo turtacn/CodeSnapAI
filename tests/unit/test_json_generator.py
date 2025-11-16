@@ -7,10 +7,11 @@ from codesage.snapshot.json_generator import JSONGenerator
 from codesage.snapshot.models import ProjectSnapshot
 
 # Sample analysis results for testing the generate method
-ANALYSIS_RESULTS = [
-    {
-        "path": "src/main.py",
-        "language": "python",
+def get_analysis_results(tmp_path):
+    return [
+        {
+            "path": str(tmp_path / "src/main.py"),
+            "language": "python",
         "hash": "abc",
         "lines": 100,
         "ast_summary": {
@@ -22,25 +23,36 @@ ANALYSIS_RESULTS = [
     }
 ]
 
+@pytest.fixture(autouse=True)
+def create_dummy_file(tmp_path):
+    """Creates a dummy file for tests to use."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "main.py").touch()
+
 @pytest.fixture
-def project_snapshot():
+def project_snapshot(tmp_path):
     """Provides a ProjectSnapshot instance from a fixture file."""
     snapshot_path = pathlib.Path("tests/fixtures/snapshot_samples/full_snapshot_v1.json")
-    return ProjectSnapshot.model_validate_json(snapshot_path.read_text())
+    snapshot_data = json.loads(snapshot_path.read_text())
+    snapshot_data["metadata"]["project_name"] = "test_project"
+    snapshot_data["metadata"]["file_count"] = 1
+    snapshot_data["metadata"]["total_size"] = 100
+    return ProjectSnapshot.model_validate(snapshot_data)
 
 @pytest.fixture
 def json_generator():
     """Provides a JSONGenerator instance."""
     return JSONGenerator()
 
-def test_generate_snapshot(json_generator):
+def test_generate_snapshot(json_generator, tmp_path):
     """Tests that the generate method creates a valid ProjectSnapshot."""
     config = {"some_config": "value"}
-    snapshot = json_generator.generate(ANALYSIS_RESULTS, config)
+    snapshot = json_generator.generate(get_analysis_results(tmp_path), config)
 
     assert isinstance(snapshot, ProjectSnapshot)
     assert len(snapshot.files) == 1
-    assert snapshot.files[0].path == "src/main.py"
+    assert snapshot.files[0].path == str(tmp_path / "src/main.py")
     assert snapshot.metadata.tool_version is not None
     assert snapshot.global_metrics["total_files"] == 1
 

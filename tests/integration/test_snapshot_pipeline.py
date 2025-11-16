@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+import json
 from codesage.snapshot.json_generator import JSONGenerator
 from codesage.snapshot.markdown_generator import MarkdownGenerator
 from codesage.snapshot.compressor import SnapshotCompressor
@@ -11,13 +12,21 @@ from codesage.snapshot.models import ProjectSnapshot
 def snapshot_v1():
     """Loads a sample snapshot from a fixture."""
     path = Path("tests/fixtures/snapshot_samples/full_snapshot_v1.json")
-    return ProjectSnapshot.model_validate_json(path.read_text())
+    snapshot_data = json.loads(path.read_text())
+    snapshot_data["metadata"]["project_name"] = "test_project"
+    snapshot_data["metadata"]["file_count"] = 1
+    snapshot_data["metadata"]["total_size"] = 100
+    return ProjectSnapshot.model_validate(snapshot_data)
 
 @pytest.fixture
 def snapshot_v2():
     """Loads a second sample snapshot for comparison."""
     path = Path("tests/fixtures/snapshot_samples/incremental_snapshot.json")
-    snapshot = ProjectSnapshot.model_validate_json(path.read_text())
+    snapshot_data = json.loads(path.read_text())
+    snapshot_data["metadata"]["project_name"] = "test_project"
+    snapshot_data["metadata"]["file_count"] = 2
+    snapshot_data["metadata"]["total_size"] = 200
+    snapshot = ProjectSnapshot.model_validate(snapshot_data)
     snapshot.metadata.version = "v2"
     return snapshot
 

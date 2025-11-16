@@ -1,6 +1,7 @@
 from click.testing import CliRunner
 from codesage.cli.main import main
 from unittest.mock import patch, MagicMock
+import os
 
 @patch('codesage.cli.commands.snapshot.SnapshotVersionManager')
 def test_snapshot_create(mock_manager):
@@ -9,10 +10,12 @@ def test_snapshot_create(mock_manager):
     instance = mock_manager.return_value
     instance.save_snapshot.return_value = ".codesage/snapshots/v1.json"
 
-    result = runner.invoke(main, ['snapshot', 'create'])
+    with runner.isolated_filesystem():
+        os.makedirs("test_project")
+        result = runner.invoke(main, ['snapshot', 'create', 'test_project'])
 
-    assert result.exit_code == 0
-    assert "Snapshot saved to .codesage/snapshots/v1.json" in result.output
+        assert result.exit_code == 0
+        assert "Snapshot created at .codesage/snapshots/v1.json" in result.output
 
 @patch('codesage.cli.commands.snapshot.SnapshotVersionManager')
 def test_snapshot_list(mock_manager):

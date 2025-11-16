@@ -14,7 +14,8 @@ from datetime import datetime
 def base_snapshot():
     """Provides a base snapshot with complexity and dependency data."""
     return ProjectSnapshot(
-        metadata=SnapshotMetadata(version="v1", timestamp=datetime.now(), tool_version="0.1.0", config_hash="abc"),
+        metadata=SnapshotMetadata(version="v1", timestamp=datetime.now(), tool_version="0.1.0", config_hash="abc",
+                                project_name="test", file_count=2, total_size=30),
         files=[
             FileSnapshot(
                 path="a.py", hash="hash_a", language="python", lines=10,
@@ -36,7 +37,8 @@ def base_snapshot():
 def modified_snapshot():
     """Provides a modified snapshot with changes to complexity and dependencies."""
     return ProjectSnapshot(
-        metadata=SnapshotMetadata(version="v2", timestamp=datetime.now(), tool_version="0.1.0", config_hash="abc"),
+        metadata=SnapshotMetadata(version="v2", timestamp=datetime.now(), tool_version="0.1.0", config_hash="abc",
+                                project_name="test", file_count=2, total_size=55),
         files=[
             FileSnapshot( # Modified complexity
                 path="b.py", hash="hash_b_new", language="python", lines=25,

@@ -4,10 +4,11 @@ from codesage.snapshot.models import ProjectSnapshot
 import pathlib
 
 # Sample analysis results for testing the generate method
-ANALYSIS_RESULTS = [
-    {
-        "path": "src/main.py",
-        "language": "python",
+def get_analysis_results(tmp_path):
+    return [
+        {
+            "path": str(tmp_path / "src/main.py"),
+            "language": "python",
         "hash": "abc",
         "lines": 100,
         "ast_summary": {
@@ -24,16 +25,23 @@ def markdown_generator():
     """Provides a MarkdownGenerator instance."""
     return MarkdownGenerator(template_dir="codesage/snapshot/templates")
 
-@pytest.fixture
-def generated_snapshot(markdown_generator):
-    """Provides a ProjectSnapshot generated from sample analysis results."""
-    return markdown_generator.generate(ANALYSIS_RESULTS, {})
+@pytest.fixture(autouse=True)
+def create_dummy_file(tmp_path):
+    """Creates a dummy file for tests to use."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "main.py").touch()
 
-def test_generate_snapshot(generated_snapshot):
+@pytest.fixture
+def generated_snapshot(markdown_generator, tmp_path):
+    """Provides a ProjectSnapshot generated from sample analysis results."""
+    return markdown_generator.generate(get_analysis_results(tmp_path), {})
+
+def test_generate_snapshot(generated_snapshot, tmp_path):
     """Tests that the generate method creates a valid ProjectSnapshot."""
     assert isinstance(generated_snapshot, ProjectSnapshot)
     assert len(generated_snapshot.files) == 1
-    assert generated_snapshot.files[0].path == "src/main.py"
+    assert generated_snapshot.files[0].path == str(tmp_path / "src/main.py")
 
 def test_render_overview_section(markdown_generator, generated_snapshot):
     """Tests that the project overview section is rendered correctly."""
