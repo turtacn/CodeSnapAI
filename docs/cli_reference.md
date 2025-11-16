@@ -54,6 +54,7 @@ codesage analyze ./src -f json -o report.json
 
 **子命令**:
 - `create`: 创建新快照
+  - `--path`: 要分析的代码路径 (默认为当前目录)
 - `list`: 列出所有快照
 - `show <VERSION>`: 显示快照详情
 - `cleanup`: 清理过期快照

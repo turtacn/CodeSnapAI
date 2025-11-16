@@ -134,13 +134,13 @@ poetry install
     ```bash
     poetry run codesage config init --interactive
     ```
-2.  **Analyze Your Code**:
+2.  **Analyze Your Code & Create a Snapshot**:
     ```bash
-    poetry run codesage analyze ./your-project
+    poetry run codesage snapshot create --path ./your-project
     ```
-3.  **Create a Snapshot**:
+3.  **View Your Snapshots**:
     ```bash
-    poetry run codesage snapshot create
+    poetry run codesage snapshot list
     ```
 
 ### Quick Start
