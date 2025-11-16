@@ -278,6 +278,18 @@ CodeSnapAI 实现了多维度的代码质量度量体系：
 | 耦合度  | 传出耦合（Efferent Coupling）       | 当前模块依赖的外部模块数   | 模块稳定性评估  |
 | 可维护性 | 可维护性指数（Maintainability Index） | 综合复杂度、代码行数与注释率 | 整体质量评估   |
 
+#### 3.1.3 Semantic Analysis Implementation Details
+
+Based on the AST, multi-dimensional semantic analysis is performed:
+
+*   **Complexity Analysis**: Calculates cyclomatic complexity, cognitive complexity, and Halstead metrics at both function and file levels.
+*   **Dependency Analysis**: Constructs a dependency graph to analyze import relationships and call graphs. It detects circular dependencies and identifies dependency chains.
+*   **Code Pattern Analysis**: Identifies design patterns (e.g., Singleton, Factory) and anti-patterns (e.g., God Class, Long Function) to help improve code quality.
+
+A **Symbol Table** is built to index functions, classes, and variable definitions, which supports cross-file reference analysis and the construction of a **Call Graph**.
+
+An extensible **Analysis Rule Engine** allows for the configuration of analysis rules, such as complexity thresholds and dependency constraints, providing flexibility to meet the needs of different projects.
+
 ### 3.2 治理编排器（Governance Orchestrator）
 
 治理编排器是实现自动化代码治理的核心组件，它协调问题扫描、LLM 修复方案生成、补丁应用与验证的完整流程。

@@ -1,28 +1,31 @@
+from typing import List, Optional, Any
 from pydantic import BaseModel
-from typing import List, Optional
 
-class FunctionNode(BaseModel):
+class ASTNode(BaseModel):
+    node_type: str
+    start_line: int = 0
+    end_line: int = 0
+    children: List['ASTNode'] = []
+    # A generic property to hold things like operator/operand values
+    value: Any = None
+
+class FunctionNode(ASTNode):
     name: str
-    params: List[str]
-    return_type: Optional[str]
-    start_line: int
-    end_line: int
-    complexity: int
-    is_async: bool = False
-    decorators: List[str] = []
+    # Assuming complexity from P2 is stored here
+    cyclomatic_complexity: int = 1
+    cognitive_complexity: int = 0
 
-class ClassNode(BaseModel):
+class ClassNode(ASTNode):
     name: str
-    methods: List[FunctionNode]
-    base_classes: List[str]
+    methods: List[FunctionNode] = []
 
-class ImportNode(BaseModel):
-    module: str
-    alias: Optional[str]
-    is_relative: bool = False
+class ImportNode(ASTNode):
+    path: str
 
 class FileAST(BaseModel):
-    language: str
-    functions: List[FunctionNode]
-    classes: List[ClassNode]
-    imports: List[ImportNode]
+    path: str
+    functions: List[FunctionNode] = []
+    classes: List[ClassNode] = []
+    imports: List[ImportNode] = []
+    # The root of the raw AST tree
+    tree: Optional[ASTNode] = None

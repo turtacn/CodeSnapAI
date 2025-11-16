@@ -16,3 +16,13 @@ ignore_paths:
   - "node_modules/"
   - "vendor/"
   - "tests/"
+
+analyzers:
+  complexity:
+    function_threshold: 10
+    file_threshold: 200
+  dependency:
+    max_depth: 5
+    detect_cycles: true
+  patterns:
+    enabled_rules: ["singleton", "factory", "god_class"]
