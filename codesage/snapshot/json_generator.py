@@ -1,6 +1,7 @@
 import json
 import hashlib
 import subprocess
+import os
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -31,7 +32,7 @@ class JSONGenerator(SnapshotGenerator):
         file_snapshots = [FileSnapshot.model_validate(ar) for ar in analysis_results]
 
         # 2. Generate metadata
-        metadata = self._create_metadata(config)
+        metadata = self._create_metadata(config, file_snapshots)
 
         # 3. Aggregate project-level data
         global_metrics = self._aggregate_metrics(analysis_results)
@@ -52,7 +53,7 @@ class JSONGenerator(SnapshotGenerator):
             issues=all_issues,
         )
 
-    def _create_metadata(self, config: Dict[str, Any]) -> SnapshotMetadata:
+    def _create_metadata(self, config: Dict[str, Any], file_snapshots: List[FileSnapshot]) -> SnapshotMetadata:
         """Creates the metadata for the snapshot."""
         git_commit = self._get_git_commit()
         config_hash = hashlib.md5(
@@ -62,6 +63,9 @@ class JSONGenerator(SnapshotGenerator):
         return SnapshotMetadata(
             version="v1",  # Versioning will be handled by SnapshotVersionManager
             timestamp=datetime.now(),
+            project_name="unknown", # Dummy value
+            file_count=len(file_snapshots),
+            total_size=sum(os.path.getsize(fs.path) for fs in file_snapshots),
             git_commit=git_commit,
             tool_version=tool_version,
             config_hash=config_hash,
