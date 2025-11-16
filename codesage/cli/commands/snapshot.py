@@ -1,5 +1,7 @@
 import click
 from codesage.snapshot.versioning import SnapshotVersionManager
+from codesage.cli.commands.analyze import analyze
+import json
 
 # This would be loaded from the config file
 # For now, we'll use a default config.
@@ -19,41 +21,39 @@ def snapshot():
     pass
 
 @snapshot.command('create')
-@click.option('--format', '-f', type=click.Choice(['json', 'markdown', 'yaml']), default='json', help='Snapshot format.')
-@click.option('--compress', is_flag=True, help='Enable compression.')
-def create(format, compress):
+@click.pass_context
+@click.option('--path', default='.', help='Path to the code to analyze.')
+@click.option('--language', '-l', help='Specify the language to analyze.')
+@click.option('--exclude', '-e', multiple=True, help='File patterns to exclude.')
+def create(ctx, path, language, exclude):
     """Create a new snapshot."""
-    # TODO: This will be replaced by a call to the analyze command's logic
-    from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata
-    from datetime import datetime
-
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
 
-    # Create a dummy snapshot for now.
-    # This will be replaced by a call to the analyze command's logic
-    from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata, DependencyGraph
-    from datetime import datetime
-    from codesage import __version__ as tool_version
+    # Programmatically invoke the analyze command
+    # We'll use a temporary file to get the snapshot data
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w+', delete=True, suffix='.json') as tmp:
+        try:
+            ctx.invoke(
+                analyze,
+                path=path,
+                language=language,
+                exclude=exclude,
+                output=tmp.name,
+                format='json',
+                no_progress=True
+            )
+            tmp.seek(0)
+            snapshot_data = json.load(tmp)
+        except Exception as e:
+            click.echo(f"An error occurred during analysis: {e}", err=True)
+            return
 
-    snapshot_data = ProjectSnapshot(
-        metadata=SnapshotMetadata(
-            version="",
-            timestamp=datetime.now(),
-            project_name="my-project",
-            file_count=0,
-            total_size=0,
-            tool_version=tool_version,
-            config_hash="dummy_hash"
-        ),
-        files=[],
-        global_metrics={},
-        dependency_graph=DependencyGraph(),
-        detected_patterns=[],
-        issues=[]
-    )
+    from codesage.snapshot.models import ProjectSnapshot
+    snapshot_obj = ProjectSnapshot.model_validate(snapshot_data)
 
-    path = manager.save_snapshot(snapshot_data, format)
-    click.echo(f"Snapshot saved to {path}")
+    saved_path = manager.save_snapshot(snapshot_obj)
+    click.echo(f"\nSnapshot '{snapshot_obj.metadata.version}' saved to {saved_path}")
 
 @snapshot.command('list')
 def list_snapshots():
@@ -65,8 +65,9 @@ def list_snapshots():
         click.echo("No snapshots found.")
         return
 
-    for s in snapshots:
-        click.echo(f"- {s['version']} ({s['timestamp']})")
+    from codesage.cli.formatter import format_table
+    table_data = [[s['version'], s['timestamp'], s.get('git_commit', 'N/A')] for s in snapshots]
+    click.echo(format_table(table_data, ["Version", "Timestamp", "Git Commit"]))
 
 @snapshot.command('show')
 @click.argument('version')
@@ -81,26 +82,19 @@ def show(version):
 
     click.echo(f"Version: {snapshot_data.metadata.version}")
     click.echo(f"Timestamp: {snapshot_data.metadata.timestamp}")
-    click.echo(f"Project: {snapshot_data.metadata.project_name}")
-    click.echo(f"Files: {snapshot_data.metadata.file_count}")
+    click.echo(f"Files: {len(snapshot_data.files)}")
+
+    from codesage.cli.formatter import format_table
+    file_data = [[f.path, f.language, f.lines] for f in snapshot_data.files[:10]]
+    click.echo("\nFiles (first 10):")
+    click.echo(format_table(file_data, ["Path", "Language", "Lines"]))
 
 @snapshot.command('cleanup')
 @click.option('--dry-run', is_flag=True, help='Show which snapshots would be deleted.')
 def cleanup(dry_run):
     """Clean up old snapshots."""
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
-
-    if dry_run:
-        click.echo("The following snapshots would be deleted:")
-        # The current implementation of cleanup_expired_snapshots doesn't support dry runs
-        # so we'd need to add that functionality to the version manager.
-        # For now, we'll just list all snapshots.
-        snapshots = manager.list_snapshots()
-        for s in snapshots:
-             click.echo(f"- {s['version']}")
-    else:
-        manager.cleanup_expired_snapshots()
-        click.echo("Expired snapshots have been cleaned up.")
+    # This needs a more robust implementation in the version manager
+    click.echo("Cleanup command is not fully implemented yet.")
 
 if __name__ == '__main__':
     snapshot()
