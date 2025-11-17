@@ -9,6 +9,12 @@ from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata, FileSnap
 from codesage.analyzers.parser_factory import create_parser
 from codesage import __version__ as tool_version
 
+DEFAULT_EXCLUDE_DIRS = {
+    ".git", ".svn", ".hg", "CVS",
+    ".vscode", ".idea",
+    "__pycache__", "node_modules", "vendor", "dist", "build", "target",
+}
+
 DEFAULT_CONFIG = {
     "snapshot": {
         "versioning": {
@@ -45,7 +51,8 @@ def create(path, format, compress):
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
 
     file_snapshots = []
-    for root, _, files in os.walk(path):
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
         for file in files:
             file_path = os.path.join(root, file)
             language = detect_language(file_path)
