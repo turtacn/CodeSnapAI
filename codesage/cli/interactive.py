@@ -78,5 +78,7 @@ def run_wizard():
             yaml.dump(config, f)
         click.echo(f"Configuration saved to {USER_CONFIG_PATH}")
 
+    return config
+
 if __name__ == '__main__':
     run_wizard()

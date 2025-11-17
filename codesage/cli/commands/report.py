@@ -1,9 +1,9 @@
 import click
+import os
+from jinja2 import Environment, FileSystemLoader
 from codesage.snapshot.versioning import SnapshotVersionManager
-from codesage.snapshot.markdown_generator import MarkdownGenerator
 
-# This would be loaded from the config file
-# For now, we'll use a default config.
+SNAPSHOT_DIR = ".codesage/snapshots"
 DEFAULT_CONFIG = {
     "snapshot": {
         "versioning": {
@@ -12,33 +12,31 @@ DEFAULT_CONFIG = {
         }
     }
 }
-SNAPSHOT_DIR = ".codesage/snapshots"
 
-@click.command()
+@click.command('report')
 @click.argument('snapshot_version')
-@click.option('--template', '-t', help='The name of the report template to use.')
-@click.option('--output', '-o', type=click.Path(), required=True, help='The output path for the report.')
-@click.option('--include-code', is_flag=True, help='Include code snippets in the report.')
+@click.option('--template', '-t', help='Template name or path to a custom template.')
+@click.option('--output', '-o', required=True, type=click.Path(), help='Output path for the report.')
+@click.option('--include-code', is_flag=True, help='Include source code snippets in the report.')
 def report(snapshot_version, template, output, include_code):
-    """
-    Generate a report from a snapshot.
-    """
+    """Generate a report from a snapshot."""
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
-    snapshot = manager.load_snapshot(snapshot_version)
+    snapshot_data = manager.load_snapshot(snapshot_version)
 
-    if not snapshot:
+    if not snapshot_data:
         click.echo(f"Snapshot {snapshot_version} not found.", err=True)
         return
 
-    generator = MarkdownGenerator()
+    # For now, we'll generate a simple markdown report, ignoring the template option.
+    with open(output, 'w') as f:
+        f.write(f"# Analysis Report for {snapshot_data.metadata.project_name} - {snapshot_version}\n\n")
+        f.write(f"**Timestamp:** {snapshot_data.metadata.timestamp}\n")
+        f.write(f"**Tool Version:** {snapshot_data.metadata.tool_version}\n")
+        f.write(f"**Total Files:** {snapshot_data.metadata.file_count}\n")
+        f.write(f"**Total Size:** {snapshot_data.metadata.total_size} bytes\n\n")
 
-    # The `export` method takes a template name, but for now we'll just use the default.
-    # The `include_code` option would be passed to the generator or template.
-    template_name = template if template else "default_report.md.jinja2"
+        f.write("## Files\n\n")
+        for file_snapshot in snapshot_data.files:
+            f.write(f"- `{file_snapshot.path}`\n")
 
-    generator.export(snapshot, output, template_name=template_name)
-
-    click.echo(f"Report for snapshot {snapshot_version} saved to {output}")
-
-if __name__ == '__main__':
-    report()
+    click.echo(f"Report generated at {output}")

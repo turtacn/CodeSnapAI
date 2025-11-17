@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 import jinja2
+import os
 from pygments import highlight
 from pygments.formatters import TerminalFormatter
 from pygments.lexers import get_lexer_by_name
@@ -40,6 +41,9 @@ class MarkdownGenerator(SnapshotGenerator):
         metadata = SnapshotMetadata(
             version="v1",
             timestamp=datetime.now(),
+            project_name="unknown",
+            file_count=len(file_snapshots),
+            total_size=sum(os.path.getsize(fs.path) for fs in file_snapshots),
             tool_version=tool_version,
             config_hash="abc",
         )

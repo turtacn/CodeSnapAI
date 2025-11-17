@@ -18,12 +18,8 @@ def main(config, verbose, no_color):
     """
     CodeSage: An intelligent code analysis tool.
     """
-    # TODO: Load configuration
-    # TODO: Configure logging
-    # TODO: Configure color output
     pass
 
-# TODO: Register all subcommands
 main.add_command(analyze)
 main.add_command(snapshot)
 main.add_command(diff)

@@ -4,6 +4,7 @@ from typing import List
 
 from codesage.analyzers.base import BaseParser
 from codesage.analyzers.ast_models import FunctionNode, ImportNode, ClassNode
+from codesage.snapshot.models import ASTSummary, ComplexityMetrics
 
 
 GO_COMPLEXITY_NODES = {
@@ -28,14 +29,19 @@ class GoParser(BaseParser):
         self.parser = Parser(go_language)
 
     def _parse(self, source_code: bytes):
-        return self.parser.parse(source_code)
+        try:
+            return self.parser.parse(source_code)
+        except Exception as e:
+            # TODO: Add logging here
+            print(f"Error parsing source code: {e}")
+            return None
 
     # ----------------------------------------------------------------------
     # Function extraction
     # ----------------------------------------------------------------------
     def extract_functions(self) -> List[FunctionNode]:
         functions = []
-        if not self.tree:
+        if not self.tree or not self.tree.root_node:
             return functions
 
         for node in self._walk(self.tree.root_node):
@@ -106,7 +112,7 @@ class GoParser(BaseParser):
     # ----------------------------------------------------------------------
     def extract_imports(self) -> List[ImportNode]:
         imports = []
-        if not self.tree:
+        if not self.tree or not self.tree.root_node:
             return imports
 
         for node in self._walk(self.tree.root_node):
@@ -162,3 +168,34 @@ class GoParser(BaseParser):
                 complexity += 1
 
         return complexity
+
+    def get_ast_summary(self, source_code: str) -> ASTSummary:
+        self.parse(source_code)
+        return ASTSummary(
+            function_count=len(self.extract_functions()),
+            class_count=len(self.extract_interfaces()),
+            import_count=len(self.extract_imports()),
+            comment_lines=self._count_comment_lines()
+        )
+
+    def _count_comment_lines(self) -> int:
+        if not self.tree:
+            return 0
+
+        comment_lines = set()
+        for node in self._walk(self.tree.root_node):
+            if node.type == 'comment':
+                start_line = node.start_point[0]
+                end_line = node.end_point[0]
+                for i in range(start_line, end_line + 1):
+                    comment_lines.add(i)
+        return len(comment_lines)
+
+    def get_complexity_metrics(self, source_code: str) -> ComplexityMetrics:
+        self.parse(source_code)
+        if not self.tree:
+            return ComplexityMetrics(cyclomatic=0)
+
+        return ComplexityMetrics(
+            cyclomatic=self.calculate_complexity(self.tree.root_node)
+        )
