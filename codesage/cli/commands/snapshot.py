@@ -6,6 +6,7 @@ import hashlib
 from datetime import datetime
 from codesage.snapshot.versioning import SnapshotVersionManager
 from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata, FileSnapshot, ASTSummary, ComplexityMetrics, DependencyGraph
+from codesage.analyzers.parser_factory import create_parser
 from codesage import __version__ as tool_version
 
 DEFAULT_CONFIG = {
@@ -21,6 +22,14 @@ SNAPSHOT_DIR = ".codesage/snapshots"
 def get_file_hash(path):
     with open(path, 'rb') as f:
         return hashlib.sha256(f.read()).hexdigest()
+
+def detect_language(file_path):
+    _, extension = os.path.splitext(file_path)
+    if extension == '.py':
+        return 'python'
+    elif extension == '.go':
+        return 'go'
+    return None
 
 @click.group()
 def snapshot():
@@ -39,13 +48,27 @@ def create(path, format, compress):
     for root, _, files in os.walk(path):
         for file in files:
             file_path = os.path.join(root, file)
+            language = detect_language(file_path)
+
+            if language:
+                parser = create_parser(language)
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    source_code = f.read()
+
+                ast_summary = parser.get_ast_summary(source_code)
+                complexity_metrics = parser.get_complexity_metrics(source_code)
+            else:
+                language = "unknown"
+                ast_summary=ASTSummary(function_count=0, class_count=0, import_count=0, comment_lines=0)
+                complexity_metrics=ComplexityMetrics(cyclomatic=0)
+
             file_snapshots.append(FileSnapshot(
                 path=file_path,
-                language="python",  # Dummy value
+                language=language,
                 hash=get_file_hash(file_path),
-                lines=len(open(file_path).readlines()),
-                ast_summary=ASTSummary(function_count=0, class_count=0, import_count=0, comment_lines=0),
-                complexity_metrics=ComplexityMetrics(cyclomatic=0),
+                lines=len(open(file_path, encoding='utf-8', errors='ignore').readlines()),
+                ast_summary=ast_summary,
+                complexity_metrics=complexity_metrics,
             ))
 
     total_size = sum(os.path.getsize(fs.path) for fs in file_snapshots)
