@@ -1,4 +1,5 @@
 from codesage.config.snapshot_python_defaults import PythonSnapshotConfig
+from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
 
 DEFAULT_CONFIG = {
     "languages": {
@@ -12,4 +13,7 @@ DEFAULT_CONFIG = {
     "snapshot": {
         "python": PythonSnapshotConfig().dict(),
     },
+    "rules": {
+        "python_baseline": RulesPythonBaselineConfig.default().dict(),
+    }
 }

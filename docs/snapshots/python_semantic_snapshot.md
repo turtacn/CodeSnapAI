@@ -123,3 +123,12 @@ risk_summary:
   medium_risk_files: 5
   low_risk_files: 10
 ```
+
+### Issues View
+
+The snapshot now includes an `issues` view, which provides a list of potential problems identified by the rule engine.
+
+- **`FileSnapshot.issues`**: A list of `Issue` objects found in the file. Each `Issue` object contains detailed information about the rule that was triggered, the location of the issue, and a descriptive message.
+- **`ProjectSnapshot.issues_summary`**: A summary of all issues found in the project, including the total number of issues, a breakdown by severity, and a breakdown by rule.
+
+It is important to note that the `issues` are generated independently of the `risk` score. While a file with many issues is likely to have a high risk score, the two systems provide different perspectives on code quality. The risk score is a high-level heuristic, while the issues view provides specific, actionable feedback.
