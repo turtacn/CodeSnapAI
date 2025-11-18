@@ -1,59 +1,39 @@
+from pathlib import Path
 from typing import Any, Dict, List
 import yaml
-from datetime import datetime
 
 from codesage.snapshot.base_generator import SnapshotGenerator
-from codesage.snapshot.models import (
-    ProjectSnapshot,
-    AnalysisResult,
-    FileSnapshot,
-    SnapshotMetadata,
-    DependencyGraph,
-)
-from codesage import __version__ as tool_version
+from codesage.snapshot.models import ProjectSnapshot
 
 
 class YAMLGenerator(SnapshotGenerator):
-    """Generates a YAML snapshot of the project."""
+    def generate(self, analysis_results: List[Dict[str, Any]]) -> ProjectSnapshot:
+        # For the new flow, the builder creates the ProjectSnapshot directly.
+        # This generator is now primarily for serialization.
+        if len(analysis_results) == 1 and isinstance(analysis_results[0], ProjectSnapshot):
+            return analysis_results[0]
+        # Placeholder for legacy compatibility if needed
+        raise NotImplementedError("Direct generation from analysis_results is not supported in this workflow.")
 
-    def generate(
-        self, analysis_results: List[AnalysisResult], config: Dict[str, Any]
-    ) -> ProjectSnapshot:
-        """
-        Generates a ProjectSnapshot object from a list of analysis results.
-        """
-        file_snapshots = [FileSnapshot.model_validate(ar) for ar in analysis_results]
-        metadata = SnapshotMetadata(
-            version="v1",
-            timestamp=datetime.now(),
-            tool_version=tool_version,
-            config_hash="abc",
-        )
-        global_metrics = self._aggregate_metrics(analysis_results)
-        dependency_graph = DependencyGraph() # Placeholder
-        all_patterns = self._collect_all_patterns(analysis_results)
-        all_issues = self._collect_all_issues(analysis_results)
-
-        return ProjectSnapshot(
-            metadata=metadata,
-            files=file_snapshots,
-            global_metrics=global_metrics,
-            dependency_graph=dependency_graph,
-            detected_patterns=all_patterns,
-            issues=all_issues,
-        )
-
-    def export(self, snapshot: ProjectSnapshot, output_path: str):
-        """
-        Exports the snapshot to a YAML file.
-        """
-        snapshot_dict = snapshot.model_dump(mode='json')
+    def export(self, snapshot: ProjectSnapshot, output_path: Path, compat_modules_view: bool = False) -> None:
+        data = snapshot.model_dump(mode="json")
+        if compat_modules_view:
+            data["modules"] = self._create_modules_view(snapshot)
 
         with open(output_path, "w") as f:
-            yaml.dump(
-                snapshot_dict,
-                f,
-                default_flow_style=False,
-                sort_keys=False,
-                allow_unicode=True,
-            )
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+
+    def _create_modules_view(self, snapshot: ProjectSnapshot) -> Dict[str, Any]:
+        modules = {}
+        for file_snapshot in snapshot.files:
+            module_path = ".".join(file_snapshot.path.split("/")[:-1])
+            if module_path not in modules:
+                modules[module_path] = {
+                    "num_classes": 0,
+                    "num_functions": 0,
+                    "files": [],
+                }
+            modules[module_path]["num_classes"] += file_snapshot.metrics.num_classes
+            modules[module_path]["num_functions"] += file_snapshot.metrics.num_functions
+            modules[module_path]["files"].append(file_snapshot.path)
+        return modules

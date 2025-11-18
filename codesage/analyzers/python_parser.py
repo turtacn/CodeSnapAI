@@ -34,7 +34,14 @@ class PythonParser(BaseParser):
 
         for node in self._walk(self.tree.root_node):
             if node.type in ("function_definition", "async_function_definition"):
-                functions.append(self._build_function_node(node))
+                # Check if the function is inside a class
+                parent = node.parent
+                while parent:
+                    if parent.type == "class_definition":
+                        break
+                    parent = parent.parent
+                else:
+                    functions.append(self._build_function_node(node))
 
         return functions
 
@@ -51,7 +58,7 @@ class PythonParser(BaseParser):
                 methods = []
                 body = node.child_by_field_name("body")
                 if body:
-                    for child in self._walk(body):
+                    for child in body.children:
                         if child.type in ("function_definition", "async_function_definition"):
                             methods.append(self._build_function_node(child))
 

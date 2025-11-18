@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
-# Placeholder for models from other modules, assuming they are Pydantic models
+
 class AnalysisResult(BaseModel):
     pass
 
-from typing import Tuple
-
 
 class DependencyGraph(BaseModel):
-    edges: List[Tuple[str, str]] = Field(default_factory=list, description="A list of tuples representing directed edges.")
+    internal: List[Dict[str, str]] = Field(default_factory=list, description="List of internal dependencies.")
+    external: List[str] = Field(default_factory=list, description="List of external dependencies.")
+    edges: List[Tuple[str, str]] = Field(default_factory=list, description="A list of tuples representing directed edges for backward compatibility.")
 
 
 class DetectedPattern(BaseModel):
@@ -27,6 +27,7 @@ class AnalysisIssue(BaseModel):
 class ComplexityMetrics(BaseModel):
     cyclomatic: int = 0
 
+
 class ASTSummary(BaseModel):
     """Summary of the Abstract Syntax Tree for a file."""
     function_count: int = Field(..., description="Number of functions in the file.")
@@ -34,16 +35,33 @@ class ASTSummary(BaseModel):
     import_count: int = Field(..., description="Number of imports in the file.")
     comment_lines: int = Field(..., description="Number of comment lines in the file.")
 
+
+class FileMetrics(BaseModel):
+    num_classes: int = Field(0, description="Number of classes in the file.")
+    num_functions: int = Field(0, description="Number of functions in the file.")
+    num_methods: int = Field(0, description="Number of methods in the file.")
+    has_async: bool = Field(False, description="Whether the file contains async code.")
+    uses_type_hints: bool = Field(False, description="Whether the file uses type hints.")
+
+
 class FileSnapshot(BaseModel):
     """Represents a snapshot of a single file."""
     path: str = Field(..., description="The relative path to the file.")
     language: str = Field(..., description="The programming language of the file.")
-    hash: str = Field(..., description="The SHA256 hash of the file content.")
-    lines: int = Field(..., description="The total number of lines in the file.")
-    ast_summary: ASTSummary = Field(..., description="A summary of the file's AST.")
-    complexity_metrics: ComplexityMetrics = Field(..., description="Complexity metrics for the file.")
+
+    # New fields
+    metrics: Optional[FileMetrics] = Field(None, description="A summary of the file's metrics.")
+    symbols: Optional[Dict[str, Any]] = Field(default_factory=dict, description="A dictionary of symbols defined in the file.")
+
+    # Old fields for compatibility
+    hash: Optional[str] = Field(None, description="The SHA256 hash of the file content.")
+    lines: Optional[int] = Field(None, description="The total number of lines in the file.")
+    ast_summary: Optional[ASTSummary] = Field(None, description="A summary of the file's AST.")
+    complexity_metrics: Optional[ComplexityMetrics] = Field(None, description="Complexity metrics for the file.")
+
     detected_patterns: List[DetectedPattern] = Field(default_factory=list, description="Patterns detected in the file.")
     issues: List[AnalysisIssue] = Field(default_factory=list, description="Issues identified in the file.")
+
 
 class SnapshotMetadata(BaseModel):
     """Metadata associated with a project snapshot."""
@@ -56,11 +74,18 @@ class SnapshotMetadata(BaseModel):
     tool_version: str = Field(..., description="The version of the codesage tool.")
     config_hash: str = Field(..., description="The MD5 hash of the configuration file used for this snapshot.")
 
+
 class ProjectSnapshot(BaseModel):
     """Represents a snapshot of the entire project."""
     metadata: SnapshotMetadata = Field(..., description="Metadata for the snapshot.")
     files: List[FileSnapshot] = Field(..., description="A list of snapshots for each file in the project.")
-    global_metrics: Dict[str, Any] = Field(..., description="Project-wide metrics (e.g., total lines, language distribution).")
-    dependency_graph: DependencyGraph = Field(..., description="The project's dependency graph.")
-    detected_patterns: List[DetectedPattern] = Field(..., description="A list of all patterns detected across the project.")
-    issues: List[AnalysisIssue] = Field(..., description="A list of all issues identified across the project.")
+
+    # New field
+    dependencies: Optional[DependencyGraph] = Field(None, description="The project's dependency graph.")
+
+    # Old fields for compatibility
+    global_metrics: Optional[Dict[str, Any]] = Field(None, description="Project-wide metrics (e.g., total lines, language distribution).")
+    dependency_graph: Optional[DependencyGraph] = Field(None, description="The project's dependency graph for backward compatibility.")
+
+    detected_patterns: List[DetectedPattern] = Field(default_factory=list, description="A list of all patterns detected across the project.")
+    issues: List[AnalysisIssue] = Field(default_factory=list, description="A list of all issues identified across the project.")

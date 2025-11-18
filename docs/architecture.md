@@ -467,6 +467,26 @@ graph LR
 * **增量快照**：支持基于前一版本的增量快照，仅记录变更部分
 * **压缩算法**：使用 zlib 或 lz4 进行数据压缩，平衡压缩率与解压速度
 
+#### 3.3.3 Python Semantic Snapshot Implementation Status
+
+A dedicated Python semantic snapshot has been implemented to provide detailed analysis for Python projects. This implementation aligns with the `ProjectSnapshot` model and provides a YAML-based output format.
+
+**Key Features:**
+
+*   **Python-Specific Metrics**: The snapshot includes metrics such as the number of classes, functions, and methods, as well as whether a file uses `async` or type hints.
+*   **Symbol Extraction**: The snapshot lists the classes and functions defined in each file.
+*   **Backward Compatibility**: The YAML output can be generated with a simplified `modules` view to maintain compatibility with older tools.
+
+**Field Mapping:**
+
+The fields in the Python semantic snapshot map directly to the `ProjectSnapshot` model. For a detailed breakdown of the fields, see the [Python Semantic Snapshot documentation](./snapshots/python_semantic_snapshot.md).
+
+**Current Limitations:**
+
+*   The dependency graph is not yet implemented.
+*   The `uses_type_hints` metric is a placeholder and is not yet functional.
+*   Risk scoring and issue detection are not yet included.
+
 ---
 
 ## 4. 部署架构

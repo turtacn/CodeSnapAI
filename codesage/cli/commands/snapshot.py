@@ -4,10 +4,14 @@ import json
 import gzip
 import hashlib
 from datetime import datetime
+from pathlib import Path
+
 from codesage.snapshot.versioning import SnapshotVersionManager
 from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata, FileSnapshot, ASTSummary, ComplexityMetrics, DependencyGraph
 from codesage.analyzers.parser_factory import create_parser
 from codesage import __version__ as tool_version
+from codesage.semantic_digest.python_snapshot_builder import PythonSemanticSnapshotBuilder, SnapshotConfig
+from codesage.snapshot.yaml_generator import YAMLGenerator
 
 DEFAULT_EXCLUDE_DIRS = {
     ".git", ".svn", ".hg", "CVS",
@@ -44,10 +48,27 @@ def snapshot():
 
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
-@click.option('--format', '-f', type=click.Choice(['json']), default='json', help='Snapshot format.')
+@click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest']), default='json', help='Snapshot format.')
+@click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
-def create(path, format, compress):
+def create(path, format, output, compress):
     """Create a new snapshot from the given path."""
+    root_path = Path(path)
+
+    if format == 'python-semantic-digest':
+        if output is None:
+            output = f"{root_path.name}_python_semantic_digest.yaml"
+
+        config = SnapshotConfig()
+        builder = PythonSemanticSnapshotBuilder(root_path, config)
+        project_snapshot = builder.build()
+
+        generator = YAMLGenerator()
+        generator.export(project_snapshot, Path(output), compat_modules_view=True)
+
+        click.echo(f"Python semantic digest created at {output}")
+        return
+
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
 
     file_snapshots = []
@@ -93,7 +114,7 @@ def create(path, format, compress):
         ),
         files=file_snapshots,
         global_metrics={},
-        dependency_graph=DependencyGraph(nodes=[], links=[]),
+        dependency_graph=DependencyGraph(edges=[]),
         detected_patterns=[],
         issues=[]
     )
