@@ -199,6 +199,26 @@ codesage govern scan_results.json --llm claude-3-5-sonnet --apply
 
 ---
 
+### Using in CI
+
+You can use the `codesage report` command to generate reports and enforce CI policies.
+
+```bash
+# Generate reports
+codesage report \
+  --input /path/to/snapshot.yaml \
+  --out-json /path/to/report.json \
+  --out-md /path/to/report.md \
+  --out-junit /path/to/report.junit.xml
+
+# Enforce CI policy
+codesage report \
+  --input /path/to/snapshot.yaml \
+  --ci-policy-strict
+```
+
+---
+
 ## 📊 Usage Examples
 
 ### Example 1: CI/CD Integration

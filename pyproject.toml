@@ -21,6 +21,7 @@ pygments = "^2.19.2"
 networkx = ">=2.5,<3.0"
 questionary = "^2.0.1"
 rich = "^13.7.1"
+lxml = ">=4.9.1"
 
 
 [tool.poetry.dev-dependencies]

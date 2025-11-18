@@ -1,6 +1,7 @@
 from codesage.config.llm import LLMConfig
 from codesage.config.snapshot_python_defaults import PythonSnapshotConfig
 from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
+from codesage.config.ci import CIPolicyConfig
 
 DEFAULT_CONFIG = {
     "languages": {
@@ -18,4 +19,5 @@ DEFAULT_CONFIG = {
         "python_baseline": RulesPythonBaselineConfig.default().dict(),
     },
     "llm": LLMConfig.default().dict(),
+    "ci": CIPolicyConfig.default().dict(),
 }
