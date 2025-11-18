@@ -1,3 +1,4 @@
+from codesage.config.llm import LLMConfig
 from codesage.config.snapshot_python_defaults import PythonSnapshotConfig
 from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
 
@@ -15,5 +16,6 @@ DEFAULT_CONFIG = {
     },
     "rules": {
         "python_baseline": RulesPythonBaselineConfig.default().dict(),
-    }
+    },
+    "llm": LLMConfig.default().dict(),
 }

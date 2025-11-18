@@ -68,6 +68,11 @@ class Issue(BaseModel):
     symbol: Optional[str] = Field(None, description="The symbol (e.g., function, class) associated with the issue.")
     tags: List[str] = Field(default_factory=list, description="Tags for categorizing the issue.")
     suggested_fix_summary: Optional[str] = Field(None, description="A brief summary of a suggested fix.")
+    llm_fix_hint: Optional[str] = Field(None, description="LLM generated fix hint.")
+    llm_rationale: Optional[str] = Field(None, description="LLM generated rationale for the fix.")
+    llm_status: Literal["not_requested", "requested", "succeeded", "failed"] = Field("not_requested", description="The status of the LLM suggestion.")
+    llm_model: Optional[str] = Field(None, description="The LLM model used to generate the suggestion.")
+    llm_last_updated_at: Optional[datetime] = Field(None, description="The timestamp when the LLM suggestion was last updated.")
 
     @model_validator(mode="before")
     def generate_id(cls, data):
@@ -87,6 +92,12 @@ class ProjectIssuesSummary(BaseModel):
     total_issues: int = Field(..., description="The total number of issues found.")
     by_severity: Dict[str, int] = Field(default_factory=dict, description="A count of issues grouped by severity.")
     by_rule: Dict[str, int] = Field(default_factory=dict, description="A count of issues grouped by rule ID.")
+
+
+class LLMCallStats(BaseModel):
+    total_requests: int = Field(0, description="Total number of LLM requests made.")
+    succeeded: int = Field(0, description="Number of successful LLM requests.")
+    failed: int = Field(0, description="Number of failed LLM requests.")
 
 
 class FileSnapshot(BaseModel):
@@ -128,6 +139,7 @@ class ProjectSnapshot(BaseModel):
     dependencies: Optional[DependencyGraph] = Field(None, description="The project's dependency graph.")
     risk_summary: Optional[ProjectRiskSummary] = Field(None, description="Summary of project risk.")
     issues_summary: Optional[ProjectIssuesSummary] = Field(None, description="Summary of project issues.")
+    llm_stats: Optional[LLMCallStats] = Field(None, description="Statistics about LLM calls.")
 
     # Old fields for compatibility
     global_metrics: Optional[Dict[str, Any]] = Field(None, description="Project-wide metrics.")

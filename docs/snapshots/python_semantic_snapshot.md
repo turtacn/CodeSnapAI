@@ -132,3 +132,15 @@ The snapshot now includes an `issues` view, which provides a list of potential p
 - **`ProjectSnapshot.issues_summary`**: A summary of all issues found in the project, including the total number of issues, a breakdown by severity, and a breakdown by rule.
 
 It is important to note that the `issues` are generated independently of the `risk` score. While a file with many issues is likely to have a high risk score, the two systems provide different perspectives on code quality. The risk score is a high-level heuristic, while the issues view provides specific, actionable feedback.
+
+### LLM-Assisted Remediation Suggestions
+
+The `Issue` model can be further enriched with LLM-assisted remediation suggestions. This is an optional step that can be performed by running the `llm-suggest` CLI command.
+
+When this step is performed, the following fields are added to each `Issue` object:
+
+- `llm_fix_hint`: A brief, actionable suggestion for fixing the issue.
+- `llm_rationale`: A brief explanation of why the suggested fix is recommended.
+- `llm_status`: The status of the LLM suggestion.
+- `llm_model`: The name of the LLM model used to generate the suggestion.
+- `llm_last_updated_at`: The timestamp when the suggestion was last updated.
