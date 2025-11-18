@@ -1,10 +1,12 @@
 from __future__ import annotations
 import os
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
+from codesage.config.jules import JulesPromptConfig
 from codesage.governance.task_models import GovernanceTask
 from codesage.snapshot.models import ProjectSnapshot
+from codesage.jules.prompt_templates import JulesPromptTemplate, get_template_for_rule
 
 
 class JulesTaskView(BaseModel):
@@ -73,3 +75,24 @@ def build_jules_task_view(
         notes_for_human_reviewer=notes_for_human,
     )
     return view
+
+
+def build_view_and_template_for_task(
+    task: GovernanceTask,
+    snapshot: ProjectSnapshot,
+    jules_config: JulesPromptConfig
+) -> Tuple[JulesTaskView, Optional[JulesPromptTemplate]]:
+    """
+    A one-stop function to get the JulesTaskView and the appropriate prompt template.
+    """
+    # Build the JulesTaskView
+    view = build_jules_task_view(
+        task=task,
+        snapshot=snapshot,
+        max_context_lines=jules_config.max_code_context_lines,
+    )
+
+    # Select the template
+    template = get_template_for_rule(task.rule_id, task.language)
+
+    return view, template

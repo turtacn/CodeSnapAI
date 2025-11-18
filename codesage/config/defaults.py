@@ -3,6 +3,7 @@ from codesage.config.snapshot_python_defaults import PythonSnapshotConfig
 from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
 from codesage.config.ci import CIPolicyConfig
 from codesage.config.governance import GovernanceConfig
+from codesage.config.jules import JulesPromptConfig
 
 DEFAULT_CONFIG = {
     "languages": {
@@ -22,4 +23,5 @@ DEFAULT_CONFIG = {
     "llm": LLMConfig.default().dict(),
     "ci": CIPolicyConfig.default().dict(),
     "governance": GovernanceConfig.default().dict(),
+    "jules": JulesPromptConfig.default().dict(),
 }
