@@ -8,6 +8,7 @@ from .commands.diff import diff
 from .commands.config import config
 from .commands.report import report
 from .commands.llm_suggest import llm_suggest
+from .commands.governance_plan import governance_plan_command
 from .plugin_loader import load_plugins
 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
@@ -27,6 +28,7 @@ main.add_command(diff)
 main.add_command(config)
 main.add_command(report)
 main.add_command(llm_suggest)
+main.add_command(governance_plan_command)
 
 # Load plugin commands
 load_plugins(main)

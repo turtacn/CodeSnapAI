@@ -1,0 +1,36 @@
+metadata:
+  version: '2.0'
+  timestamp: '2023-10-27T10:00:00Z'
+  project_name: 'integration_test_project'
+  file_count: 2
+  total_size: 200
+  tool_version: '0.5.0'
+  config_hash: 'xyz123'
+files:
+  - path: 'src/main.py'
+    language: 'python'
+    risk:
+      risk_score: 0.9
+      level: 'high'
+      factors: ['high complexity']
+    issues:
+      - rule_id: 'PY_HIGH_CYCLO'
+        severity: 'error'
+        message: 'Function `complex_function` has a cyclomatic complexity of 25.'
+        location:
+          file_path: 'src/main.py'
+          line: 50
+        symbol: 'complex_function'
+  - path: 'src/utils.py'
+    language: 'python'
+    risk:
+      risk_score: 0.2
+      level: 'low'
+      factors: []
+    issues:
+      - rule_id: 'PY_UNUSED_IMPORT'
+        severity: 'warning'
+        message: 'Unused import `os`.'
+        location:
+          file_path: 'src/utils.py'
+          line: 5
