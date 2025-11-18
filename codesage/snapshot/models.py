@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AnalysisResult(BaseModel):
@@ -60,7 +60,7 @@ class IssueLocation(BaseModel):
     column: Optional[int] = Field(None, description="The column number of the issue.")
 
 class Issue(BaseModel):
-    id: str
+    id: str = ""
     rule_id: str = Field(..., description="The identifier of the rule that was triggered.")
     severity: Literal["info", "warning", "error"] = Field(..., description="The severity of the issue.")
     message: str = Field(..., description="A human-readable description of the issue.")
@@ -69,16 +69,19 @@ class Issue(BaseModel):
     tags: List[str] = Field(default_factory=list, description="Tags for categorizing the issue.")
     suggested_fix_summary: Optional[str] = Field(None, description="A brief summary of a suggested fix.")
 
-    @field_validator('id', mode='before', check_fields=False)
-    def generate_id(cls, v, values):
-        if v:
-            return v
-        data = values.data
-        rule_id = data.get('rule_id', 'unknown-rule')
-        location = data.get('location')
-        if location and isinstance(location, IssueLocation):
-            return f"{rule_id}:{location.file_path}:{location.line}"
-        return f"{rule_id}:unknown-location"
+    @model_validator(mode="before")
+    def generate_id(cls, data):
+        if isinstance(data, dict) and "id" not in data:
+            rule_id = data.get("rule_id")
+            location = data.get("location")
+            if rule_id and location:
+                if isinstance(location, dict):
+                    file_path = location.get("file_path", "unknown-file")
+                    line = location.get("line", 0)
+                    data["id"] = f"{rule_id}:{file_path}:{line}"
+                elif isinstance(location, IssueLocation):
+                    data["id"] = f"{rule_id}:{location.file_path}:{location.line}"
+        return data
 
 class ProjectIssuesSummary(BaseModel):
     total_issues: int = Field(..., description="The total number of issues found.")

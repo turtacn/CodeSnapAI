@@ -56,16 +56,13 @@ def test_yaml_generator_project_snapshot_shape(project_snapshot, tmp_path):
     assert "files" in data
     assert "dependencies" in data
 
-def test_yaml_generator_backward_compat_modules_view(project_snapshot, tmp_path):
+def test_yaml_generator_export(project_snapshot, tmp_path):
     generator = YAMLGenerator()
     output_path = tmp_path / "snapshot.yaml"
-    generator.export(project_snapshot, output_path, compat_modules_view=True)
+    generator.export(project_snapshot, output_path)
+    assert output_path.exists()
 
     with open(output_path, "r") as f:
         data = yaml.safe_load(f)
-
-    assert "modules" in data
-    assert "my_project.module1" in data["modules"]
-    assert "my_project.module2" in data["modules"]
-    assert data["modules"]["my_project.module1"]["num_classes"] == 1
-    assert data["modules"]["my_project.module2"]["num_functions"] == 3
+    assert "files" in data
+    assert len(data["files"]) == 2

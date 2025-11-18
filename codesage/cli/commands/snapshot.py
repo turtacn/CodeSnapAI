@@ -64,7 +64,7 @@ def create(path, format, output, compress):
         project_snapshot = builder.build()
 
         generator = YAMLGenerator()
-        generator.export(project_snapshot, Path(output), compat_modules_view=True)
+        generator.export(project_snapshot, Path(output))
 
         click.echo(f"Python semantic digest created at {output}")
         return

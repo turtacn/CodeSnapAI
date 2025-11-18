@@ -2,7 +2,6 @@ from typing import List
 from codesage.rules.base import BaseRule, RuleContext
 from codesage.snapshot.models import Issue, IssueLocation
 from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
-import uuid
 
 class RuleHighCyclomaticFunction(BaseRule):
     rule_id = "PY_HIGH_CYCLOMATIC_FUNCTION"
@@ -12,23 +11,24 @@ class RuleHighCyclomaticFunction(BaseRule):
     def check(self, ctx: RuleContext) -> List[Issue]:
         issues = []
         threshold = ctx.config.max_cyclomatic_threshold
-        metrics = ctx.file.metrics
+        # Assuming function details are stored in symbols
+        functions = ctx.file.symbols.get("functions_detail", []) if ctx.file.symbols else []
 
-        # This is a simplification. A real implementation would need function-level complexity from symbols.
-        if metrics and metrics.max_cyclomatic_complexity > threshold:
-            loc = IssueLocation(
-                file_path=ctx.file.path,
-                line=1, # Placeholder: we don't have the exact line number of the function
-            )
-            issue = Issue(
-                id=str(uuid.uuid4()),
-                rule_id=self.rule_id,
-                severity=self.default_severity,
-                message=f"File contains at least one function with cyclomatic complexity of {metrics.max_cyclomatic_complexity}, which exceeds the threshold of {threshold}.",
-                location=loc,
-                tags=["complexity", "hotspot"],
-            )
-            issues.append(issue)
+        for func in functions:
+            if func.get("cyclomatic_complexity", 0) > threshold:
+                loc = IssueLocation(
+                    file_path=ctx.file.path,
+                    line=func.get("start_line", 1),
+                )
+                issue = Issue(
+                    rule_id=self.rule_id,
+                    severity=self.default_severity,
+                    message=f"Function '{func.get('name')}' has a cyclomatic complexity of {func.get('cyclomatic_complexity')}, which exceeds the threshold of {threshold}.",
+                    location=loc,
+                    symbol=func.get("name"),
+                    tags=["complexity", "hotspot"],
+                )
+                issues.append(issue)
         return issues
 
 class RuleHighFanOutFile(BaseRule):
@@ -44,7 +44,6 @@ class RuleHighFanOutFile(BaseRule):
         if metrics and metrics.fan_out > threshold:
             loc = IssueLocation(file_path=ctx.file.path, line=1)
             issue = Issue(
-                id=str(uuid.uuid4()),
                 rule_id=self.rule_id,
                 severity=self.default_severity,
                 message=f"File has a fan-out of {metrics.fan_out}, which exceeds the threshold of {threshold}.",
@@ -68,7 +67,6 @@ class RuleLargeFile(BaseRule):
         if metrics and metrics.lines_of_code > threshold:
             loc = IssueLocation(file_path=ctx.file.path, line=1)
             issue = Issue(
-                id=str(uuid.uuid4()),
                 rule_id=self.rule_id,
                 severity=self.default_severity,
                 message=f"File has {metrics.lines_of_code} lines of code, which exceeds the threshold of {threshold}.",
@@ -78,6 +76,42 @@ class RuleLargeFile(BaseRule):
             issues.append(issue)
         return issues
 
+
+class RuleMissingTypeHintsInPublicAPI(BaseRule):
+    rule_id = "PY_MISSING_TYPE_HINTS"
+    description = "Checks for missing type hints in public API functions."
+    default_severity = "info"
+
+    def check(self, ctx: RuleContext) -> List[Issue]:
+        issues = []
+        functions = ctx.file.symbols.get("functions_detail", []) if ctx.file.symbols else []
+
+        for func in functions:
+            func_name = func.get("name", "")
+            # A simple definition of public API: not starting with an underscore.
+            if not func_name.startswith("_"):
+                params = func.get("params", [])
+                has_return_type = func.get("return_type") is not None
+
+                # Check for untyped params. This is a simplification.
+                # A real implementation would check the `params` list for types.
+                if not has_return_type: # Simplified check
+                    loc = IssueLocation(
+                        file_path=ctx.file.path,
+                        line=func.get("start_line", 1),
+                    )
+                    issue = Issue(
+                        rule_id=self.rule_id,
+                        severity=self.default_severity,
+                        message=f"Public function '{func_name}' is missing a return type hint.",
+                        location=loc,
+                        symbol=func_name,
+                        tags=["typing", "readability"],
+                    )
+                    issues.append(issue)
+        return issues
+
+
 def get_python_baseline_rules(config: RulesPythonBaselineConfig) -> List[BaseRule]:
     rules: List[BaseRule] = []
     if config.enable_high_cyclomatic_rule:
@@ -86,4 +120,6 @@ def get_python_baseline_rules(config: RulesPythonBaselineConfig) -> List[BaseRul
         rules.append(RuleHighFanOutFile())
     if config.enable_large_file_rule:
         rules.append(RuleLargeFile())
+    if config.enable_missing_type_hints_rule:
+        rules.append(RuleMissingTypeHintsInPublicAPI())
     return rules

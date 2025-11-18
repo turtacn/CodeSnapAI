@@ -61,8 +61,7 @@ class PythonSemanticSnapshotBuilder:
         if self.rules_config.enabled:
             rules = get_python_baseline_rules(self.rules_config)
             engine = RuleEngine(rules=rules)
-            project_with_issues = engine.run(project, self.rules_config)
-            return project_with_issues
+            project = engine.run(project, self.rules_config)
 
         return project
 
@@ -77,6 +76,14 @@ class PythonSemanticSnapshotBuilder:
         classes = self.parser.extract_classes()
 
         complexity_results = analyze_file_complexity(source_code, self.risk_config.threshold_complexity_high)
+
+        # Create a map of function name to complexity
+        if complexity_results:
+            complexity_map = {
+                f.name: f.complexity for f in complexity_results.functions
+            }
+            for func in functions:
+                func.cyclomatic_complexity = complexity_map.get(func.name, 1)
         fan_in, fan_out = self._calculate_fan_in_out(str(file_path.relative_to(self.root_path)))
 
         metrics = FileMetrics(
@@ -96,8 +103,9 @@ class PythonSemanticSnapshotBuilder:
         file_risk = score_file_risk(metrics, self.risk_config)
 
         symbols = {
-            "classes": [c.name for c in classes],
-            "functions": [f.name for f in functions],
+            "classes": [c.dict() for c in classes],
+            "functions": [f.dict() for f in functions],
+            "functions_detail": [f.dict() for f in functions], # For richer rule context
         }
 
         return FileSnapshot(
