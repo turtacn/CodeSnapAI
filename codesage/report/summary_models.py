@@ -1,9 +1,9 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional, Any, Dict
 
-
-from typing import Dict
+from codesage.history.diff_models import ProjectDiffSummary
+from codesage.history.regression_detector import RegressionWarning
 
 
 class ReportFileSummary(BaseModel):
@@ -32,3 +32,18 @@ class ReportProjectSummary(BaseModel):
     top_risky_files: List[str] = Field(..., description="A list of the top risky files in the project.")
     languages: List[str] = Field(..., description="A list of the languages found in the project.")
     files_per_language: Dict[str, int] = Field(..., description="A count of files per language.")
+
+
+class ProjectDiffSummaryView(ProjectDiffSummary):
+    pass
+
+
+class RegressionSummaryView(BaseModel):
+    warnings: List[RegressionWarning] = Field(..., description="A list of regression warnings.")
+
+
+class Report(BaseModel):
+    project_summary: ReportProjectSummary
+    files: List[ReportFileSummary]
+    diff_summary: Optional[ProjectDiffSummaryView] = None
+    regression_summary: Optional[RegressionSummaryView] = None
