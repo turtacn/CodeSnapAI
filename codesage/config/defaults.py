@@ -4,6 +4,7 @@ from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
 from codesage.config.ci import CIPolicyConfig
 from codesage.config.governance import GovernanceConfig
 from codesage.config.jules import JulesPromptConfig
+from codesage.config.web import WebConsoleConfig
 
 DEFAULT_CONFIG = {
     "languages": {
@@ -24,4 +25,5 @@ DEFAULT_CONFIG = {
     "ci": CIPolicyConfig.default().dict(),
     "governance": GovernanceConfig.default().dict(),
     "jules": JulesPromptConfig.default().dict(),
+    "web": WebConsoleConfig.default().dict(),
 }

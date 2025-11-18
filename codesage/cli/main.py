@@ -10,6 +10,7 @@ from .commands.report import report
 from .commands.llm_suggest import llm_suggest
 from .commands.governance_plan import governance_plan_command
 from .commands.jules_prompt import jules_prompt_command
+from .commands.web_console import web_console_command
 from .plugin_loader import load_plugins
 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
@@ -31,6 +32,7 @@ main.add_command(report)
 main.add_command(llm_suggest)
 main.add_command(governance_plan_command)
 main.add_command(jules_prompt_command)
+main.add_command(web_console_command)
 
 # Load plugin commands
 load_plugins(main)

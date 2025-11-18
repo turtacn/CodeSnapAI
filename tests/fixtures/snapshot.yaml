@@ -1,0 +1,22 @@
+project_name: test-project
+metadata:
+  version: "1.0"
+  timestamp: "2025-11-18T00:00:00Z"
+  project_name: "test-project"
+  file_count: 1
+  total_size: 100
+  tool_version: "0.1.0"
+  config_hash: "dummy_hash"
+files_per_language:
+  python: 1
+files:
+  - path: a/b/c.py
+    language: python
+    metrics:
+      complexity: 5
+      loc: 100
+    risk:
+      level: "low"
+      score: 10.0
+      risk_score: 10.0
+    issues: []

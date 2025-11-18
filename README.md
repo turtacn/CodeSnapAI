@@ -199,6 +199,24 @@ codesage govern scan_results.json --llm claude-3-5-sonnet --apply
 
 ---
 
+### Web Console
+
+CodeSage includes a web-based console for visualizing analysis results, reports, and governance plans.
+
+**Launch the Console:**
+
+```bash
+codesage web-console
+```
+
+This will start a local web server (default: `http://127.0.0.1:8080`) where you can browse the project dashboard, file details, and governance tasks.
+
+**Screenshot Placeholder:**
+
+![Web Console Screenshot](docs/web/console_screenshot_placeholder.png)
+
+---
+
 ### Using in CI
 
 You can use the `codesage report` command to generate reports and enforce CI policies.

@@ -1,0 +1,18 @@
+project_name: "test-project"
+created_at: "2025-11-18T00:00:00Z"
+summary: {}
+groups:
+  - id: "test-group"
+    name: "Test Group"
+    group_by: "rule"
+    tasks:
+      - id: "test-task-1"
+        task_id: "test-task-1"
+        file_path: "a/b/c.py"
+        language: "python"
+        rule_id: "test-rule"
+        description: "Test description"
+        priority: 1
+        risk_level: "high"
+        status: "pending"
+        metadata: {}

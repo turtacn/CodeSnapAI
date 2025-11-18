@@ -1,0 +1,17 @@
+{
+    "project_summary": {
+        "total_files": 1,
+        "high_risk_files": 1,
+        "medium_risk_files": 0,
+        "low_risk_files": 0,
+        "total_issues": 5,
+        "error_issues": 1,
+        "warning_issues": 2,
+        "info_issues": 2,
+        "top_rules": [],
+        "top_risky_files": [],
+        "languages": ["python"],
+        "files_per_language": {"python": 1}
+    },
+    "files": []
+}
