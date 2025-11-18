@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Literal
 
 from pydantic import BaseModel, Field
 
@@ -43,17 +43,39 @@ class FileMetrics(BaseModel):
     has_async: bool = Field(False, description="Whether the file contains async code.")
     uses_type_hints: bool = Field(False, description="Whether the file uses type hints.")
 
+    # New complexity and coupling metrics
+    lines_of_code: int = Field(0, description="Number of lines of code.")
+    max_cyclomatic_complexity: int = Field(0, description="Maximum cyclomatic complexity of any function.")
+    avg_cyclomatic_complexity: float = Field(0.0, description="Average cyclomatic complexity of functions.")
+    high_complexity_functions: int = Field(0, description="Number of functions with high cyclomatic complexity.")
+    fan_in: int = Field(0, description="Number of files that depend on this file.")
+    fan_out: int = Field(0, description="Number of files this file depends on.")
+
+
+class FileRisk(BaseModel):
+    """Risk assessment for a single file."""
+    risk_score: float = Field(..., description="The calculated risk score (0-1).")
+    level: Literal["low", "medium", "high"] = Field(..., description="The risk level.")
+    factors: List[str] = Field(default_factory=list, description="Factors contributing to the risk score.")
+
+
+class ProjectRiskSummary(BaseModel):
+    """Summary of risk across the project."""
+    avg_risk: float = Field(..., description="Average risk score across all files.")
+    high_risk_files: int = Field(..., description="Number of high-risk files.")
+    medium_risk_files: int = Field(..., description="Number of medium-risk files.")
+    low_risk_files: int = Field(..., description="Number of low-risk files.")
+
 
 class FileSnapshot(BaseModel):
     """Represents a snapshot of a single file."""
     path: str = Field(..., description="The relative path to the file.")
     language: str = Field(..., description="The programming language of the file.")
 
-    # New fields
     metrics: Optional[FileMetrics] = Field(None, description="A summary of the file's metrics.")
     symbols: Optional[Dict[str, Any]] = Field(default_factory=dict, description="A dictionary of symbols defined in the file.")
+    risk: Optional[FileRisk] = Field(None, description="Risk assessment for the file.")
 
-    # Old fields for compatibility
     hash: Optional[str] = Field(None, description="The SHA256 hash of the file content.")
     lines: Optional[int] = Field(None, description="The total number of lines in the file.")
     ast_summary: Optional[ASTSummary] = Field(None, description="A summary of the file's AST.")
@@ -79,11 +101,9 @@ class ProjectSnapshot(BaseModel):
     """Represents a snapshot of the entire project."""
     metadata: SnapshotMetadata = Field(..., description="Metadata for the snapshot.")
     files: List[FileSnapshot] = Field(..., description="A list of snapshots for each file in the project.")
-
-    # New field
     dependencies: Optional[DependencyGraph] = Field(None, description="The project's dependency graph.")
+    risk_summary: Optional[ProjectRiskSummary] = Field(None, description="Summary of project risk.")
 
-    # Old fields for compatibility
     global_metrics: Optional[Dict[str, Any]] = Field(None, description="Project-wide metrics (e.g., total lines, language distribution).")
     dependency_graph: Optional[DependencyGraph] = Field(None, description="The project's dependency graph for backward compatibility.")
 

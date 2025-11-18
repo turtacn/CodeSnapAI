@@ -16,7 +16,7 @@ class YAMLGenerator(SnapshotGenerator):
         raise NotImplementedError("Direct generation from analysis_results is not supported in this workflow.")
 
     def export(self, snapshot: ProjectSnapshot, output_path: Path, compat_modules_view: bool = False) -> None:
-        data = snapshot.model_dump(mode="json")
+        data = snapshot.model_dump(mode="json", exclude_none=True)
         if compat_modules_view:
             data["modules"] = self._create_modules_view(snapshot)
 
@@ -32,8 +32,21 @@ class YAMLGenerator(SnapshotGenerator):
                     "num_classes": 0,
                     "num_functions": 0,
                     "files": [],
+                    "risk": {
+                        "max_risk_score": 0.0,
+                        "high_risk_files": 0,
+                    }
                 }
-            modules[module_path]["num_classes"] += file_snapshot.metrics.num_classes
-            modules[module_path]["num_functions"] += file_snapshot.metrics.num_functions
+
+            if file_snapshot.metrics:
+                modules[module_path]["num_classes"] += file_snapshot.metrics.num_classes
+                modules[module_path]["num_functions"] += file_snapshot.metrics.num_functions
+
+            if file_snapshot.risk:
+                if file_snapshot.risk.risk_score > modules[module_path]["risk"]["max_risk_score"]:
+                    modules[module_path]["risk"]["max_risk_score"] = file_snapshot.risk.risk_score
+                if file_snapshot.risk.level == "high":
+                    modules[module_path]["risk"]["high_risk_files"] += 1
+
             modules[module_path]["files"].append(file_snapshot.path)
         return modules

@@ -68,3 +68,58 @@ dependencies:
   internal: []
   external: []
 ```
+
+## Complexity and Risk Fields
+
+### FileMetrics
+
+The `FileMetrics` model has been extended to include the following complexity and coupling metrics:
+
+- `lines_of_code`: The total number of lines in the file.
+- `max_cyclomatic_complexity`: The highest cyclomatic complexity of any function in the file.
+- `avg_cyclomatic_complexity`: The average cyclomatic complexity of all functions in the file.
+- `high_complexity_functions`: The number of functions with a cyclomatic complexity greater than the configured threshold.
+- `fan_in`: The number of other files that import the current file.
+- `fan_out`: The number of other files that are imported by the current file.
+
+### FileRisk
+
+The `FileRisk` model provides a risk assessment for each file.
+
+- `risk_score`: A normalized score between 0 and 1, where 1 is the highest risk.
+- `level`: The risk level, which can be "low", "medium", or "high".
+- `factors`: A list of strings that identify the factors contributing to the risk score.
+
+### ProjectRiskSummary
+
+The `ProjectRiskSummary` model provides a summary of the risk for the entire project.
+
+- `avg_risk`: The average risk score across all files.
+- `high_risk_files`: The number of files with a high risk level.
+- `medium_risk_files`: The number of files with a medium risk level.
+- `low_risk_files`: The number of files with a low risk level.
+
+### Example YAML
+
+```yaml
+files:
+  - path: my_module/my_file.py
+    language: python
+    metrics:
+      lines_of_code: 100
+      max_cyclomatic_complexity: 12
+      avg_cyclomatic_complexity: 4.5
+      high_complexity_functions: 1
+      fan_in: 5
+      fan_out: 2
+    risk:
+      risk_score: 0.75
+      level: high
+      factors:
+        - high_cyclomatic_complexity
+risk_summary:
+  avg_risk: 0.35
+  high_risk_files: 1
+  medium_risk_files: 5
+  low_risk_files: 10
+```
