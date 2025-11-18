@@ -9,10 +9,14 @@ def risk_config():
 
 def test_risk_score_low(risk_config):
     metrics = FileMetrics(
-        max_cyclomatic_complexity=5,
-        avg_cyclomatic_complexity=2.0,
-        fan_out=2,
         lines_of_code=50,
+        language_specific={
+            "python": {
+                "max_cyclomatic_complexity": 5,
+                "avg_cyclomatic_complexity": 2.0,
+                "fan_out": 2,
+            }
+        }
     )
     risk = score_file_risk(metrics, risk_config)
     assert risk.risk_score < risk_config.threshold_risk_medium
@@ -21,10 +25,14 @@ def test_risk_score_low(risk_config):
 
 def test_risk_score_high(risk_config):
     metrics = FileMetrics(
-        max_cyclomatic_complexity=15,
-        avg_cyclomatic_complexity=8.0,
-        fan_out=25,
         lines_of_code=1500,
+        language_specific={
+            "python": {
+                "max_cyclomatic_complexity": 15,
+                "avg_cyclomatic_complexity": 8.0,
+                "fan_out": 25,
+            }
+        }
     )
     risk = score_file_risk(metrics, risk_config)
     assert risk.risk_score >= risk_config.threshold_risk_high

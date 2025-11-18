@@ -17,6 +17,8 @@ def test_ci_pass_when_under_threshold():
         info_issues=0,
         top_rules=[],
         top_risky_files=[],
+        languages=["python"],
+        files_per_language={"python": 1},
     )
     config = CIPolicyConfig(enabled=True, max_high_risk_files=1, max_error_issues=1)
 
@@ -38,6 +40,8 @@ def test_ci_fail_on_high_risk_files():
         info_issues=0,
         top_rules=[],
         top_risky_files=[],
+        languages=["python"],
+        files_per_language={"python": 1},
     )
     config = CIPolicyConfig(enabled=True, max_high_risk_files=1)
 
@@ -59,6 +63,8 @@ def test_ci_fail_on_error_issues():
         info_issues=0,
         top_rules=[],
         top_risky_files=[],
+        languages=["python"],
+        files_per_language={"python": 1},
     )
     config = CIPolicyConfig(enabled=True, fail_on_error_issues=True, max_error_issues=1)
 

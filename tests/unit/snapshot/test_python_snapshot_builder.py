@@ -19,12 +19,14 @@ def test_python_builder_metrics_counts(complex_project_path):
     snapshot = builder.build()
 
     user_model_snapshot = next(f for f in snapshot.files if f.path == "models/user.py")
-    assert user_model_snapshot.metrics.num_classes == 1
+    python_metrics = user_model_snapshot.metrics.language_specific.get("python", {})
+    assert python_metrics.get("num_classes") == 1
     assert user_model_snapshot.metrics.num_functions == 0
-    assert user_model_snapshot.metrics.num_methods == 2 # __init__ and get_name
+    assert python_metrics.get("num_methods") == 2 # __init__ and get_name
 
     user_service_snapshot = next(f for f in snapshot.files if f.path == "services/user_service.py")
-    assert user_service_snapshot.metrics.num_classes == 1
+    python_metrics = user_service_snapshot.metrics.language_specific.get("python", {})
+    assert python_metrics.get("num_classes") == 1
     assert user_service_snapshot.metrics.num_functions == 1
-    assert user_service_snapshot.metrics.num_methods == 2 # __init__ and add_user
-    assert user_service_snapshot.metrics.has_async is True
+    assert python_metrics.get("num_methods") == 2 # __init__ and add_user
+    assert python_metrics.get("has_async") is True

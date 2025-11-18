@@ -46,27 +46,46 @@ def snapshot():
     """Manage code snapshots."""
     pass
 
+from codesage.semantic_digest.go_snapshot_builder import GoSemanticSnapshotBuilder
+from codesage.semantic_digest.shell_snapshot_builder import ShellSemanticSnapshotBuilder
+
+
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
 @click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest']), default='json', help='Snapshot format.')
 @click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
-def create(path, format, output, compress):
+@click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'auto']), default='python', help='Language to analyze.')
+def create(path, format, output, compress, language):
     """Create a new snapshot from the given path."""
     root_path = Path(path)
 
     if format == 'python-semantic-digest':
         if output is None:
-            output = f"{root_path.name}_python_semantic_digest.yaml"
+            output = f"{root_path.name}_{language}_semantic_digest.yaml"
 
         config = SnapshotConfig()
-        builder = PythonSemanticSnapshotBuilder(root_path, config)
+        if language == 'python':
+            builder = PythonSemanticSnapshotBuilder(root_path, config)
+        elif language == 'go':
+            builder = GoSemanticSnapshotBuilder(root_path, config)
+        elif language == 'shell':
+            builder = ShellSemanticSnapshotBuilder(root_path, config)
+        elif language == 'auto':
+            # In a real implementation, this would involve more sophisticated logic
+            # to detect languages and combine snapshots.
+            click.echo("Auto language detection is not yet implemented.")
+            return
+        else:
+            click.echo(f"Unsupported language: {language}", err=True)
+            return
+
         project_snapshot = builder.build()
 
         generator = YAMLGenerator()
         generator.export(project_snapshot, Path(output))
 
-        click.echo(f"Python semantic digest created at {output}")
+        click.echo(f"{language.capitalize()} semantic digest created at {output}")
         return
 
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])

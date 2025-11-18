@@ -3,8 +3,12 @@ from pydantic import BaseModel, Field
 from typing import List
 
 
+from typing import Dict
+
+
 class ReportFileSummary(BaseModel):
     path: str = Field(..., description="The relative path to the file.")
+    language: str = Field(..., description="The programming language of the file.")
     risk_level: str = Field(..., description="The risk level of the file (e.g., 'low', 'medium', 'high').")
     risk_score: float = Field(..., description="The risk score of the file.")
     loc: int = Field(..., description="The number of lines of code in the file.")
@@ -26,3 +30,5 @@ class ReportProjectSummary(BaseModel):
     info_issues: int = Field(..., description="The number of info-level issues in the project.")
     top_rules: List[str] = Field(..., description="A list of the top issue rules found in the project.")
     top_risky_files: List[str] = Field(..., description="A list of the top risky files in the project.")
+    languages: List[str] = Field(..., description="A list of the languages found in the project.")
+    files_per_language: Dict[str, int] = Field(..., description="A count of files per language.")

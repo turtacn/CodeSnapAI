@@ -16,10 +16,13 @@ def test_json_format_structure():
         info_issues=0,
         top_rules=["E001"],
         top_risky_files=["file1.py"],
+        languages=["python"],
+        files_per_language={"python": 1},
     )
     file_summaries = [
         ReportFileSummary(
             path="file1.py",
+            language="python",
             risk_level="high",
             risk_score=0.8,
             loc=100,

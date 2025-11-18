@@ -36,17 +36,10 @@ class ASTSummary(BaseModel):
 # --- Current Models ---
 
 class FileMetrics(BaseModel):
-    num_classes: int = Field(0, description="Number of classes in the file.")
-    num_functions: int = Field(0, description="Number of functions in the file.")
-    num_methods: int = Field(0, description="Number of methods in the file.")
-    has_async: bool = Field(False, description="Whether the file contains async code.")
-    uses_type_hints: bool = Field(False, description="Whether the file uses type hints.")
     lines_of_code: int = Field(0, description="Number of lines of code.")
-    max_cyclomatic_complexity: int = Field(0, description="Maximum cyclomatic complexity of any function.")
-    avg_cyclomatic_complexity: float = Field(0.0, description="Average cyclomatic complexity of functions.")
-    high_complexity_functions: int = Field(0, description="Number of functions with high cyclomatic complexity.")
-    fan_in: int = Field(0, description="Number of files that depend on this file.")
-    fan_out: int = Field(0, description="Number of files this file depends on.")
+    num_functions: int = Field(0, description="Number of functions in the file.")
+    num_types: int = Field(0, description="Number of types in the file.")
+    language_specific: Dict[str, Any] = Field(default_factory=dict, description="Language-specific metrics.")
 
 
 class FileRisk(BaseModel):
@@ -140,6 +133,8 @@ class ProjectSnapshot(BaseModel):
     risk_summary: Optional[ProjectRiskSummary] = Field(None, description="Summary of project risk.")
     issues_summary: Optional[ProjectIssuesSummary] = Field(None, description="Summary of project issues.")
     llm_stats: Optional[LLMCallStats] = Field(None, description="Statistics about LLM calls.")
+    languages: List[str] = Field(default_factory=list, description="List of languages in the project.")
+    language_stats: Dict[str, Any] = Field(default_factory=dict, description="Statistics about each language.")
 
     # Old fields for compatibility
     global_metrics: Optional[Dict[str, Any]] = Field(None, description="Project-wide metrics.")

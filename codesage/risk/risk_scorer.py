@@ -9,10 +9,16 @@ def score_file_risk(metrics: FileMetrics, config: RiskBaselineConfig) -> FileRis
 
     factors = []
 
+    python_metrics = metrics.language_specific.get("python", {})
+
     # Normalize metrics (simple division, can be improved)
-    norm_max_cc = min(metrics.max_cyclomatic_complexity / config.threshold_complexity_high, 1.0)
-    norm_avg_cc = min(metrics.avg_cyclomatic_complexity / config.threshold_complexity_high, 1.0)
-    norm_fan_out = min(metrics.fan_out / 20, 1.0)  # Assuming 20 is a high fan-out
+    max_cc = python_metrics.get("max_cyclomatic_complexity", 0)
+    avg_cc = python_metrics.get("avg_cyclomatic_complexity", 0.0)
+    fan_out = python_metrics.get("fan_out", 0)
+
+    norm_max_cc = min(max_cc / config.threshold_complexity_high, 1.0)
+    norm_avg_cc = min(avg_cc / config.threshold_complexity_high, 1.0)
+    norm_fan_out = min(fan_out / 20, 1.0)  # Assuming 20 is a high fan-out
     norm_loc = min(metrics.lines_of_code / 1000, 1.0) # Assuming 1000 is a large file
 
     risk_score = (
@@ -32,9 +38,9 @@ def score_file_risk(metrics: FileMetrics, config: RiskBaselineConfig) -> FileRis
     else:
         level = "low"
 
-    if metrics.max_cyclomatic_complexity > config.threshold_complexity_high:
+    if max_cc > config.threshold_complexity_high:
         factors.append("high_cyclomatic_complexity")
-    if metrics.fan_out > 20:
+    if fan_out > 20:
         factors.append("high_fan_out")
     if metrics.lines_of_code > 1000:
         factors.append("large_file")

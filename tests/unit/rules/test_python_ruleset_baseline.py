@@ -67,7 +67,9 @@ def test_high_fan_out_rule_triggers_issue(baseline_config, minimal_metadata):
     file_snapshot = FileSnapshot(
         path="test.py",
         language="python",
-        metrics=FileMetrics(fan_out=10),
+        metrics=FileMetrics(
+            language_specific={"python": {"fan_out": 10}}
+        ),
     )
     project_snapshot = ProjectSnapshot(metadata=minimal_metadata, files=[file_snapshot])
     ctx = RuleContext(

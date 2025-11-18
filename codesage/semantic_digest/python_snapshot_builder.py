@@ -22,16 +22,18 @@ from codesage.snapshot.models import (
 class SnapshotConfig(dict):
     pass
 
-class PythonSemanticSnapshotBuilder:
+from codesage.semantic_digest.base_builder import BaseLanguageSnapshotBuilder, SnapshotConfig
+
+
+class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
     def __init__(self, root_path: Path, config: SnapshotConfig) -> None:
-        self.root_path = root_path
-        self.config = config
+        super().__init__(root_path, config)
         self.parser = PythonParser()
         self.risk_config = RiskBaselineConfig.from_defaults()
         self.rules_config = RulesPythonBaselineConfig.default() # This would be loaded from main config in a real app
 
     def build(self) -> ProjectSnapshot:
-        files = self._collect_python_files()
+        files = self._collect_files()
 
         # In a real scenario, this would be populated by a dependency analyzer
         self.dependency_info = {str(f.relative_to(self.root_path)): [] for f in files}
@@ -65,7 +67,7 @@ class PythonSemanticSnapshotBuilder:
 
         return project
 
-    def _collect_python_files(self) -> List[Path]:
+    def _collect_files(self) -> List[Path]:
         return list(self.root_path.rglob("*.py"))
 
     def _build_file_snapshot(self, file_path: Path) -> FileSnapshot:
@@ -87,17 +89,22 @@ class PythonSemanticSnapshotBuilder:
         fan_in, fan_out = self._calculate_fan_in_out(str(file_path.relative_to(self.root_path)))
 
         metrics = FileMetrics(
-            num_classes=len(classes),
-            num_functions=len(functions),
-            num_methods=sum(len(c.methods) for c in classes),
-            has_async=any(f.is_async for f in functions) or any(m.is_async for c in classes for m in c.methods),
-            uses_type_hints=False, # Placeholder
             lines_of_code=complexity_results.loc if complexity_results else 0,
-            max_cyclomatic_complexity=complexity_results.max_cyclomatic_complexity if complexity_results else 0,
-            avg_cyclomatic_complexity=complexity_results.avg_cyclomatic_complexity if complexity_results else 0.0,
-            high_complexity_functions=complexity_results.high_complexity_functions if complexity_results else 0,
-            fan_in=fan_in,
-            fan_out=fan_out,
+            num_functions=len(functions),
+            num_types=len(classes),
+            language_specific={
+                "python": {
+                    "num_classes": len(classes),
+                    "num_methods": sum(len(c.methods) for c in classes),
+                    "has_async": any(f.is_async for f in functions) or any(m.is_async for c in classes for m in c.methods),
+                    "uses_type_hints": False,  # Placeholder
+                    "max_cyclomatic_complexity": complexity_results.max_cyclomatic_complexity if complexity_results else 0,
+                    "avg_cyclomatic_complexity": complexity_results.avg_cyclomatic_complexity if complexity_results else 0.0,
+                    "high_complexity_functions": complexity_results.high_complexity_functions if complexity_results else 0,
+                    "fan_in": fan_in,
+                    "fan_out": fan_out,
+                }
+            }
         )
 
         file_risk = score_file_risk(metrics, self.risk_config)

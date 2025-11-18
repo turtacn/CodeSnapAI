@@ -41,16 +41,19 @@ class RuleHighFanOutFile(BaseRule):
         threshold = ctx.config.fan_out_threshold
         metrics = ctx.file.metrics
 
-        if metrics and metrics.fan_out > threshold:
-            loc = IssueLocation(file_path=ctx.file.path, line=1)
-            issue = Issue(
-                rule_id=self.rule_id,
-                severity=self.default_severity,
-                message=f"File has a fan-out of {metrics.fan_out}, which exceeds the threshold of {threshold}.",
-                location=loc,
-                tags=["coupling"],
-            )
-            issues.append(issue)
+        if metrics:
+            python_metrics = metrics.language_specific.get("python", {})
+            fan_out = python_metrics.get("fan_out", 0)
+            if fan_out > threshold:
+                loc = IssueLocation(file_path=ctx.file.path, line=1)
+                issue = Issue(
+                    rule_id=self.rule_id,
+                    severity=self.default_severity,
+                    message=f"File has a fan-out of {fan_out}, which exceeds the threshold of {threshold}.",
+                    location=loc,
+                    tags=["coupling"],
+                )
+                issues.append(issue)
         return issues
 
 

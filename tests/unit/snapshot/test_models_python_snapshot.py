@@ -10,17 +10,21 @@ from codesage.snapshot.models import (
 
 def test_file_metrics_basic_fields():
     metrics = FileMetrics(
-        num_classes=2,
         num_functions=3,
-        num_methods=5,
-        has_async=True,
-        uses_type_hints=True,
+        language_specific={
+            "python": {
+                "num_classes": 2,
+                "num_methods": 5,
+                "has_async": True,
+                "uses_type_hints": True,
+            }
+        }
     )
-    assert metrics.num_classes == 2
+    assert metrics.language_specific["python"]["num_classes"] == 2
     assert metrics.num_functions == 3
-    assert metrics.num_methods == 5
-    assert metrics.has_async is True
-    assert metrics.uses_type_hints is True
+    assert metrics.language_specific["python"]["num_methods"] == 5
+    assert metrics.language_specific["python"]["has_async"] is True
+    assert metrics.language_specific["python"]["uses_type_hints"] is True
 
 def test_project_snapshot_structure():
     metadata = SnapshotMetadata(
