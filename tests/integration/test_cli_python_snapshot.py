@@ -1,7 +1,8 @@
 from pathlib import Path
 import yaml
 from click.testing import CliRunner
-from codesage.cli.commands.snapshot import snapshot
+from codesage.cli.main import main
+
 
 def test_cli_python_snapshot(tmp_path):
     # Create a dummy project structure
@@ -12,8 +13,9 @@ def test_cli_python_snapshot(tmp_path):
     runner = CliRunner()
     output_path = tmp_path / "snapshot.yaml"
     result = runner.invoke(
-        snapshot,
+        main,
         [
+            "snapshot",
             "create",
             str(project_path),
             "--format",

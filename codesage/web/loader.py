@@ -15,15 +15,15 @@ def load_snapshot(snapshot_path: Path) -> ProjectSnapshot:
     global _snapshot_cache
     if _snapshot_cache is None:
         data = yaml.safe_load(snapshot_path.read_text(encoding="utf-8"))
-        _snapshot_cache = ProjectSnapshot.parse_obj(data)
+        _snapshot_cache = ProjectSnapshot.model_validate(data)
     return _snapshot_cache
 
 def load_report(report_path: Path) -> Tuple[ReportProjectSummary, List[ReportFileSummary]]:
     global _report_cache
     if _report_cache is None:
         data = json.loads(report_path.read_text(encoding="utf-8"))
-        project_summary = ReportProjectSummary.parse_obj(data['project_summary'])
-        file_summaries = [ReportFileSummary.parse_obj(item) for item in data['files']]
+        project_summary = ReportProjectSummary.model_validate(data['project_summary'])
+        file_summaries = [ReportFileSummary.model_validate(item) for item in data['files']]
         _report_cache = (project_summary, file_summaries)
     return _report_cache
 
@@ -31,7 +31,7 @@ def load_governance_plan(plan_path: Path) -> GovernancePlan:
     global _plan_cache
     if _plan_cache is None:
         data = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
-        _plan_cache = GovernancePlan.parse_obj(data)
+        _plan_cache = GovernancePlan.model_validate(data)
     return _plan_cache
 
 def reload_all():

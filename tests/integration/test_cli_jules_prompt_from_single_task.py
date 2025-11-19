@@ -8,6 +8,7 @@ def single_task_file(tmp_path):
     """Creates a dummy single_task.yaml file."""
     task_content = {
         "id": "test.py:PY_MISSING_TYPE_HINTS:5",
+        "project_name": "test-project",
         "rule_id": "PY_MISSING_TYPE_HINTS",
         "language": "python",
         "description": "Missing type hints",

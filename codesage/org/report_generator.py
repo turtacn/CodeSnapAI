@@ -30,7 +30,7 @@ def render_org_report_json(overview: OrgGovernanceOverview) -> str:
             for p in overview.projects
         ],
     )
-    return json.dumps(summary.dict(), indent=2)
+    return json.dumps(summary.model_dump(), indent=2)
 
 
 def render_org_report_markdown(overview: OrgGovernanceOverview) -> str:

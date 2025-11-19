@@ -6,6 +6,7 @@ from datetime import datetime
 
 class GovernanceTask(BaseModel):
     id: str
+    project_name: str
     file_path: str
     language: str
     rule_id: str

@@ -7,6 +7,7 @@ def sample_task() -> GovernanceTask:
     """Provides a sample GovernanceTask for testing."""
     return GovernanceTask(
         id="test_task",
+        project_name="test_project",
         rule_id="PY_HIGH_CYCLOMATIC_FUNCTION",
         language="python",
         description="High complexity",

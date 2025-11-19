@@ -18,11 +18,12 @@ class TaskBuilder:
 
     def build_plan(self, snapshot: ProjectSnapshot) -> GovernancePlan:
         tasks: List[GovernanceTask] = []
+        project_name = snapshot.metadata.project_name
 
         for file in snapshot.files:
             file_risk = getattr(file, "risk", None)
             for issue in file.issues:
-                task = self._create_task_from_issue(file, issue, file_risk)
+                task = self._create_task_from_issue(project_name, file, issue, file_risk)
                 tasks.append(task)
 
         tasks = self._apply_limits(tasks)
@@ -39,6 +40,7 @@ class TaskBuilder:
 
     def _create_task_from_issue(
         self,
+        project_name: str,
         file: FileSnapshot,
         issue: Issue,
         risk: Optional[FileRisk],
@@ -60,6 +62,7 @@ class TaskBuilder:
 
         task = GovernanceTask(
             id=f"{file.path}:{issue.rule_id}:{issue.location.line}",
+            project_name=project_name,
             file_path=file.path,
             language=file.language,
             rule_id=issue.rule_id,

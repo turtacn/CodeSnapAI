@@ -9,6 +9,7 @@ from codesage.governance.task_models import (
 def test_governance_task_minimal_fields():
     task = GovernanceTask(
         id="test",
+        project_name="test_project",
         file_path="test.py",
         language="python",
         rule_id="test_rule",
@@ -23,6 +24,7 @@ def test_governance_task_minimal_fields():
 def test_governance_plan_grouping():
     task1 = GovernanceTask(
         id="test1",
+        project_name="test_project",
         file_path="test.py",
         language="python",
         rule_id="test_rule",
@@ -32,6 +34,7 @@ def test_governance_plan_grouping():
     )
     task2 = GovernanceTask(
         id="test2",
+        project_name="test_project",
         file_path="test.py",
         language="python",
         rule_id="test_rule",

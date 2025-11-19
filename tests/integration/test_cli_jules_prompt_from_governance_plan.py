@@ -19,6 +19,7 @@ def governance_plan_file(tmp_path):
                 "tasks": [
                     {
                         "id": "test.py:PY_HIGH_CYCLOMATIC_FUNCTION:1",
+                        "project_name": "test-project",
                         "rule_id": "PY_HIGH_CYCLOMATIC_FUNCTION",
                         "language": "python",
                         "description": "High complexity",

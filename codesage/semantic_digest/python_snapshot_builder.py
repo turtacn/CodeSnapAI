@@ -110,9 +110,9 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
         file_risk = score_file_risk(metrics, self.risk_config)
 
         symbols = {
-            "classes": [c.dict() for c in classes],
-            "functions": [f.dict() for f in functions],
-            "functions_detail": [f.dict() for f in functions], # For richer rule context
+            "classes": [c.model_dump() for c in classes],
+            "functions": [f.model_dump() for f in functions],
+            "functions_detail": [f.model_dump() for f in functions], # For richer rule context
         }
 
         return FileSnapshot(

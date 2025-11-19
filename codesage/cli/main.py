@@ -17,16 +17,35 @@ from .commands.history_trend import history_trend_command
 from .commands.org_report import org_report
 from .plugin_loader import load_plugins
 
+from codesage.config.loader import load_config
+from codesage.config.audit import AuditConfig
+from codesage.audit.logger import AuditLogger
+from pathlib import Path
+
+class CliContext:
+    def __init__(self, audit_logger: AuditLogger):
+        self.audit_logger = audit_logger
+
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--config', type=click.Path(), help='配置文件路径')
+@click.option('--config', 'config_path', type=click.Path(), help='配置文件路径')
 @click.option('--verbose', '-v', is_flag=True, help='详细输出')
 @click.option('--no-color', is_flag=True, help='禁用彩色输出')
 @click.version_option(version=__version__)
-def main(config, verbose, no_color):
+@click.pass_context
+def main(ctx, config_path, verbose, no_color):
     """
     CodeSage: An intelligent code analysis tool.
     """
-    pass
+    project_path = Path(config_path).parent if config_path else Path.cwd()
+    raw_config = load_config(str(project_path))
+
+    audit_config = AuditConfig(**raw_config.get('audit', {}))
+    try:
+        audit_logger = AuditLogger(audit_config)
+    except PermissionError:
+        audit_logger = AuditLogger(AuditConfig(enabled=False))
+
+    ctx.obj = CliContext(audit_logger=audit_logger)
 
 main.add_command(analyze)
 main.add_command(snapshot)

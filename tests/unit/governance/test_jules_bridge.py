@@ -14,6 +14,7 @@ def temp_file(tmp_path: Path) -> str:
 def test_jules_task_view_contains_minimal_context(temp_file: str):
     task = GovernanceTask(
         id="test_task",
+        project_name="test",
         file_path=temp_file,
         language="python",
         rule_id="test_rule",
@@ -53,6 +54,7 @@ def test_jules_task_view_respects_context_limit(temp_file: str):
 
     task = GovernanceTask(
         id="test_task",
+        project_name="test",
         file_path=temp_file,
         language="python",
         rule_id="test_rule",

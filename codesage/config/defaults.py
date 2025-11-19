@@ -7,6 +7,9 @@ from codesage.config.jules import JulesPromptConfig
 from codesage.config.web import WebConsoleConfig
 from codesage.config.history import HistoryConfig
 from codesage.config.org import OrgConfig
+from codesage.config.policy import PolicyConfig
+from codesage.config.audit import AuditConfig
+from codesage.config.integrations import IntegrationsConfig
 
 DEFAULT_CONFIG = {
     "languages": {
@@ -18,16 +21,19 @@ DEFAULT_CONFIG = {
     "thresholds": {"complexity": 20, "duplication": 10},
     "ignore_paths": ["node_modules/", "vendor/", "tests/"],
     "snapshot": {
-        "python": PythonSnapshotConfig().dict(),
+        "python": PythonSnapshotConfig().model_dump(),
     },
     "rules": {
-        "python_baseline": RulesPythonBaselineConfig.default().dict(),
+        "python_baseline": RulesPythonBaselineConfig.default().model_dump(),
     },
-    "llm": LLMConfig.default().dict(),
-    "ci": CIPolicyConfig.default().dict(),
-    "governance": GovernanceConfig.default().dict(),
-    "jules": JulesPromptConfig.default().dict(),
-    "web": WebConsoleConfig.default().dict(),
-    "history": HistoryConfig.default().dict(),
-    "org": OrgConfig.default().dict(),
+    "llm": LLMConfig.default().model_dump(),
+    "ci": CIPolicyConfig.default().model_dump(),
+    "governance": GovernanceConfig.default().model_dump(),
+    "jules": JulesPromptConfig.default().model_dump(),
+    "web": WebConsoleConfig.default().model_dump(),
+    "history": HistoryConfig.default().model_dump(),
+    "org": OrgConfig.default().model_dump(),
+    "policy": PolicyConfig().model_dump(),
+    "audit": AuditConfig().model_dump(),
+    "integrations": IntegrationsConfig().model_dump(),
 }

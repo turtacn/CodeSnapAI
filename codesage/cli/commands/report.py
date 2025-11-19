@@ -11,50 +11,94 @@ from codesage.config.ci import CIPolicyConfig
 from codesage.ci.policy import evaluate_ci_policy
 
 
+from codesage.audit.models import AuditEvent
+from datetime import datetime
+
 @click.command('report', help='Generate reports from a project snapshot.')
 @click.option('--input', 'input_path', required=True, type=click.Path(exists=True), help='Path to the snapshot YAML file.')
 @click.option('--out-json', 'out_json_path', type=click.Path(), help='Path to save the JSON report.')
 @click.option('--out-md', 'out_md_path', type=click.Path(), help='Path to save the Markdown report.')
 @click.option('--out-junit', 'out_junit_path', type=click.Path(), help='Path to save the JUnit XML report.')
 @click.option('--ci-policy-strict', 'ci_policy_strict', is_flag=True, help='Enable strict CI policy.')
-def report(input_path: str, out_json_path: Optional[str], out_md_path: Optional[str], out_junit_path: Optional[str], ci_policy_strict: bool):
-    with open(input_path, 'r') as f:
-        snapshot_data = yaml.safe_load(f)
+@click.pass_context
+def report(ctx, input_path: str, out_json_path: Optional[str], out_md_path: Optional[str], out_junit_path: Optional[str], ci_policy_strict: bool):
+    audit_logger = ctx.obj.audit_logger
+    project_name = None
+    try:
+        with open(input_path, 'r') as f:
+            snapshot_data = yaml.safe_load(f)
 
-    snapshot = ProjectSnapshot(**snapshot_data)
+        snapshot = ProjectSnapshot.model_validate(snapshot_data)
+        project_name = snapshot.metadata.project_name
 
-    project_summary, file_summaries = ReportGenerator.from_snapshot(snapshot)
+        project_summary, file_summaries = ReportGenerator.from_snapshot(snapshot)
 
-    if out_json_path:
-        json_report = render_json(project_summary, file_summaries)
-        with open(out_json_path, 'w') as f:
-            f.write(json_report)
-        click.echo(f"JSON report saved to {out_json_path}")
+        # Policy evaluation
+        from codesage.config.loader import load_config
+        from codesage.config.policy import PolicyConfig
+        from codesage.policy.parser import load_policy
+        from codesage.policy.engine import evaluate_project_policies
+        from pathlib import Path
 
-    if out_md_path:
-        md_report = render_markdown(project_summary, file_summaries)
-        with open(out_md_path, 'w') as f:
-            f.write(md_report)
-        click.echo(f"Markdown report saved to {out_md_path}")
+        raw_config = load_config()
+        policy_config = PolicyConfig(**raw_config.get('policy', {}))
+        policy_decisions = []
+        if policy_config.project_policy_path:
+            policy_path = Path(policy_config.project_policy_path)
+            if policy_path.exists():
+                try:
+                    policy = load_policy(policy_path)
+                    policy_decisions = evaluate_project_policies(policy, snapshot, project_summary, None, None)
+                except Exception as e:
+                    click.echo(f"Error loading or evaluating policy: {e}", err=True)
+                    raise click.exceptions.Exit(1)
 
-    if out_junit_path:
-        junit_report = render_junit_xml(snapshot)
-        with open(out_junit_path, 'w') as f:
-            f.write(junit_report)
-        click.echo(f"JUnit XML report saved to {out_junit_path}")
+        if out_json_path:
+            json_report = render_json(project_summary, file_summaries)
+            with open(out_json_path, 'w') as f:
+                f.write(json_report)
+            click.echo(f"JSON report saved to {out_json_path}")
 
-    if ci_policy_strict:
-        ci_policy = CIPolicyConfig(
-            enabled=True,
-            fail_on_error_issues=True,
-            max_error_issues=0,
-            max_high_risk_files=0
+        if out_md_path:
+            md_report = render_markdown(project_summary, file_summaries) # TODO: Update render_markdown to accept Report object
+            with open(out_md_path, 'w') as f:
+                f.write(md_report)
+            click.echo(f"Markdown report saved to {out_md_path}")
+
+        if out_junit_path:
+            junit_report = render_junit_xml(snapshot)
+            with open(out_junit_path, 'w') as f:
+                f.write(junit_report)
+            click.echo(f"JUnit XML report saved to {out_junit_path}")
+
+        if ci_policy_strict:
+            ci_policy = CIPolicyConfig(
+                enabled=True,
+                fail_on_error_issues=True,
+                max_error_issues=0,
+                max_high_risk_files=0
+            )
+            should_fail, reasons = evaluate_ci_policy(project_summary, ci_policy, policy_decisions=policy_decisions)
+            if should_fail:
+                click.echo("CI policy failed:", err=True)
+                for reason in reasons:
+                    click.echo(f"- {reason}", err=True)
+                raise click.exceptions.Exit(1)
+            else:
+                click.echo("CI policy passed.")
+    finally:
+        audit_logger.log(
+            AuditEvent(
+                timestamp=datetime.now(),
+                event_type="cli.report",
+                project_name=project_name,
+                command="report",
+                args={
+                    "input_path": input_path,
+                    "out_json_path": out_json_path,
+                    "out_md_path": out_md_path,
+                    "out_junit_path": out_junit_path,
+                    "ci_policy_strict": ci_policy_strict,
+                },
+            )
         )
-        should_fail, reasons = evaluate_ci_policy(project_summary, ci_policy)
-        if should_fail:
-            click.echo("CI policy failed:", err=True)
-            for reason in reasons:
-                click.echo(f"- {reason}", err=True)
-            raise click.exceptions.Exit(1)
-        else:
-            click.echo("CI policy passed.")

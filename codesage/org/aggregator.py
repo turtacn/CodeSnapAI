@@ -65,12 +65,12 @@ class OrgAggregator:
         List[RegressionWarning],
         GovernancePlan | None,
     ]:
-        snapshot = ProjectSnapshot.parse_obj(read_yaml_file(Path(ref.snapshot_path)))
+        snapshot = ProjectSnapshot.model_validate(read_yaml_file(Path(ref.snapshot_path)))
 
         report_summary = None
         if ref.report_path and Path(ref.report_path).exists():
             report_summary_dict = read_json_file(Path(ref.report_path))
-            report_summary = ReportProjectSummary.parse_obj(report_summary_dict["summary"])
+            report_summary = ReportProjectSummary.model_validate(report_summary_dict["summary"])
 
         if not report_summary:
             logger.info(f"No report found for {ref.name}, generating one from snapshot.")
@@ -94,7 +94,7 @@ class OrgAggregator:
 
         governance_plan = None
         if ref.governance_plan_path and Path(ref.governance_plan_path).exists():
-            governance_plan = GovernancePlan.parse_obj(read_yaml_file(Path(ref.governance_plan_path)))
+            governance_plan = GovernancePlan.model_validate(read_yaml_file(Path(ref.governance_plan_path)))
 
         return snapshot, report_summary, regressions, governance_plan
 

@@ -64,7 +64,7 @@ def mock_project_artifacts(tmp_path: Path) -> dict:
             language_stats={"files_per_language": {"python": 2}},
         )
         snapshot_path = proj_dir / "snapshot.yaml"
-        snapshot_path.write_text(yaml.dump(snapshot.dict()))
+        snapshot_path.write_text(yaml.dump(snapshot.model_dump()))
 
         # Create report
         report = {
@@ -83,7 +83,7 @@ def mock_project_artifacts(tmp_path: Path) -> dict:
                 languages=["python"],
                 files_per_language={"python": 2},
                 risk_level="high",
-            ).dict()
+            ).model_dump()
         }
         report_path = proj_dir / "report.json"
         report_path.write_text(json.dumps(report))
@@ -101,6 +101,7 @@ def mock_project_artifacts(tmp_path: Path) -> dict:
                     tasks=[
                         GovernanceTask(
                             id=f"task{k}",
+                            project_name=f"proj{i}",
                             file_path=f"file{k}.py",
                             language="python",
                             rule_id="rule1",
@@ -115,7 +116,7 @@ def mock_project_artifacts(tmp_path: Path) -> dict:
             ],
         )
         plan_path = proj_dir / "governance.yaml"
-        plan_path.write_text(yaml.dump(plan.dict()))
+        plan_path.write_text(yaml.dump(plan.model_dump()))
 
         projects[f"proj{i}"] = {
             "snapshot": snapshot_path,

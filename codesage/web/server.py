@@ -90,9 +90,9 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
             return ApiFileDetail(
                 path=file_snapshot.path,
                 language=file_snapshot.language,
-                metrics=file_snapshot.metrics.dict(),
-                risk=file_snapshot.risk.dict() if file_snapshot.risk else {},
-                issues=[issue.dict() for issue in file_snapshot.issues],
+                metrics=file_snapshot.metrics.model_dump(),
+                risk=file_snapshot.risk.model_dump() if file_snapshot.risk else {},
+                issues=[issue.model_dump() for issue in file_snapshot.issues],
             )
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Snapshot file not found")
@@ -141,7 +141,7 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
     def list_org_projects():
         try:
             full_config = load_config(Path.cwd())
-            org_config = OrgConfig.parse_obj(full_config.get("org", {}))
+            org_config = OrgConfig.model_validate(full_config.get("org", {}))
             if not org_config.projects:
                 return []
 
@@ -170,7 +170,7 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
     def get_org_report():
         try:
             full_config = load_config(Path.cwd())
-            org_config = OrgConfig.parse_obj(full_config.get("org", {}))
+            org_config = OrgConfig.model_validate(full_config.get("org", {}))
             if not org_config.projects:
                 raise HTTPException(status_code=404, detail="No projects configured for the organization.")
 

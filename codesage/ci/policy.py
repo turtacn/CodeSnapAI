@@ -2,12 +2,14 @@ from __future__ import annotations
 from typing import Tuple, List, Optional
 from codesage.report.summary_models import ReportProjectSummary, RegressionSummaryView
 from codesage.config.ci import CIPolicyConfig
+from codesage.policy.engine import PolicyDecision
 
 
 def evaluate_ci_policy(
     project_summary: ReportProjectSummary,
     config: CIPolicyConfig,
-    regression_summary: Optional[RegressionSummaryView] = None
+    regression_summary: Optional[RegressionSummaryView] = None,
+    policy_decisions: Optional[List[PolicyDecision]] = None,
 ) -> Tuple[bool, List[str]]:
     should_fail = False
     reasons: List[str] = []
@@ -36,5 +38,14 @@ def evaluate_ci_policy(
             # Optionally, fail CI on critical regressions
             # if config.fail_on_regression and warning.severity == 'error':
             #     should_fail = True
+
+    # Policy decisions
+    if policy_decisions:
+        for decision in policy_decisions:
+            reasons.append(
+                f"Policy '{decision.rule_id}' triggered with severity '{decision.severity}': {decision.reason}"
+            )
+            if decision.severity == 'error':
+                should_fail = True
 
     return should_fail, reasons

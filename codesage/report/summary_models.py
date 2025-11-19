@@ -1,9 +1,12 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, TYPE_CHECKING
 
 from codesage.history.diff_models import ProjectDiffSummary
 from codesage.history.regression_detector import RegressionWarning
+
+if TYPE_CHECKING:
+    from codesage.policy.dsl_models import PolicyDecision
 
 
 class ReportFileSummary(BaseModel):

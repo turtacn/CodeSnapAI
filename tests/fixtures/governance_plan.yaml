@@ -7,7 +7,7 @@ groups:
     group_by: "rule"
     tasks:
       - id: "test-task-1"
-        task_id: "test-task-1"
+        project_name: "test-project"
         file_path: "a/b/c.py"
         language: "python"
         rule_id: "test-rule"

@@ -50,104 +50,126 @@ from codesage.semantic_digest.go_snapshot_builder import GoSemanticSnapshotBuild
 from codesage.semantic_digest.shell_snapshot_builder import ShellSemanticSnapshotBuilder
 
 
+from codesage.audit.models import AuditEvent
+
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
 @click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest']), default='json', help='Snapshot format.')
 @click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
 @click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'auto']), default='python', help='Language to analyze.')
-def create(path, format, output, compress, language):
+@click.pass_context
+def create(ctx, path, format, output, compress, language):
     """Create a new snapshot from the given path."""
-    root_path = Path(path)
+    audit_logger = ctx.obj.audit_logger
+    project_name = os.path.basename(os.path.abspath(path))
+    try:
+        root_path = Path(path)
 
-    if format == 'python-semantic-digest':
-        if output is None:
-            output = f"{root_path.name}_{language}_semantic_digest.yaml"
+        if format == 'python-semantic-digest':
+            if output is None:
+                output = f"{root_path.name}_{language}_semantic_digest.yaml"
 
-        config = SnapshotConfig()
-        if language == 'python':
-            builder = PythonSemanticSnapshotBuilder(root_path, config)
-        elif language == 'go':
-            builder = GoSemanticSnapshotBuilder(root_path, config)
-        elif language == 'shell':
-            builder = ShellSemanticSnapshotBuilder(root_path, config)
-        elif language == 'auto':
-            # In a real implementation, this would involve more sophisticated logic
-            # to detect languages and combine snapshots.
-            click.echo("Auto language detection is not yet implemented.")
-            return
-        else:
-            click.echo(f"Unsupported language: {language}", err=True)
-            return
-
-        project_snapshot = builder.build()
-
-        generator = YAMLGenerator()
-        generator.export(project_snapshot, Path(output))
-
-        click.echo(f"{language.capitalize()} semantic digest created at {output}")
-        return
-
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
-
-    file_snapshots = []
-    for root, dirs, files in os.walk(path):
-        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
-        for file in files:
-            file_path = os.path.join(root, file)
-            language = detect_language(file_path)
-
-            if language:
-                parser = create_parser(language)
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    source_code = f.read()
-
-                ast_summary = parser.get_ast_summary(source_code)
-                complexity_metrics = parser.get_complexity_metrics(source_code)
+            config = SnapshotConfig()
+            if language == 'python':
+                builder = PythonSemanticSnapshotBuilder(root_path, config)
+            elif language == 'go':
+                builder = GoSemanticSnapshotBuilder(root_path, config)
+            elif language == 'shell':
+                builder = ShellSemanticSnapshotBuilder(root_path, config)
+            elif language == 'auto':
+                # In a real implementation, this would involve more sophisticated logic
+                # to detect languages and combine snapshots.
+                click.echo("Auto language detection is not yet implemented.")
+                return
             else:
-                language = "unknown"
-                ast_summary=ASTSummary(function_count=0, class_count=0, import_count=0, comment_lines=0)
-                complexity_metrics=ComplexityMetrics(cyclomatic=0)
+                click.echo(f"Unsupported language: {language}", err=True)
+                return
 
-            file_snapshots.append(FileSnapshot(
-                path=file_path,
-                language=language,
-                hash=get_file_hash(file_path),
-                lines=len(open(file_path, encoding='utf-8', errors='ignore').readlines()),
-                ast_summary=ast_summary,
-                complexity_metrics=complexity_metrics,
-            ))
+            project_snapshot = builder.build()
 
-    total_size = sum(os.path.getsize(fs.path) for fs in file_snapshots)
+            generator = YAMLGenerator()
+            generator.export(project_snapshot, Path(output))
 
-    snapshot_data = ProjectSnapshot(
-        metadata=SnapshotMetadata(
-            version="",
-            timestamp=datetime.now(),
-            project_name=os.path.basename(os.path.abspath(path)),
-            file_count=len(file_snapshots),
-            total_size=total_size,
-            tool_version=tool_version,
-            config_hash="not_implemented",
-            git_commit=None
-        ),
-        files=file_snapshots,
-        global_metrics={},
-        dependency_graph=DependencyGraph(edges=[]),
-        detected_patterns=[],
-        issues=[]
-    )
+            click.echo(f"{language.capitalize()} semantic digest created at {output}")
+            return
 
-    if compress:
-        snapshot_path = manager.save_snapshot(snapshot_data, format)
-        with open(snapshot_path, 'rb') as f_in:
-            with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
-                f_out.writelines(f_in)
-        os.remove(snapshot_path)
-        click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
-    else:
-        snapshot_path = manager.save_snapshot(snapshot_data, format)
-        click.echo(f"Snapshot created at {snapshot_path}")
+        manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
+
+        file_snapshots = []
+        for root, dirs, files in os.walk(path):
+            dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
+            for file in files:
+                file_path = os.path.join(root, file)
+                language = detect_language(file_path)
+
+                if language:
+                    parser = create_parser(language)
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        source_code = f.read()
+
+                    ast_summary = parser.get_ast_summary(source_code)
+                    complexity_metrics = parser.get_complexity_metrics(source_code)
+                else:
+                    language = "unknown"
+                    ast_summary=ASTSummary(function_count=0, class_count=0, import_count=0, comment_lines=0)
+                    complexity_metrics=ComplexityMetrics(cyclomatic=0)
+
+                file_snapshots.append(FileSnapshot(
+                    path=file_path,
+                    language=language,
+                    hash=get_file_hash(file_path),
+                    lines=len(open(file_path, encoding='utf-8', errors='ignore').readlines()),
+                    ast_summary=ast_summary,
+                    complexity_metrics=complexity_metrics,
+                ))
+
+        total_size = sum(os.path.getsize(fs.path) for fs in file_snapshots)
+
+        snapshot_data = ProjectSnapshot(
+            metadata=SnapshotMetadata(
+                version="",
+                timestamp=datetime.now(),
+                project_name=os.path.basename(os.path.abspath(path)),
+                file_count=len(file_snapshots),
+                total_size=total_size,
+                tool_version=tool_version,
+                config_hash="not_implemented",
+                git_commit=None
+            ),
+            files=file_snapshots,
+            global_metrics={},
+            dependency_graph=DependencyGraph(edges=[]),
+            detected_patterns=[],
+            issues=[]
+        )
+
+        if compress:
+            snapshot_path = manager.save_snapshot(snapshot_data, format)
+            with open(snapshot_path, 'rb') as f_in:
+                with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
+                    f_out.writelines(f_in)
+            os.remove(snapshot_path)
+            click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
+        else:
+            snapshot_path = manager.save_snapshot(snapshot_data, format)
+            click.echo(f"Snapshot created at {snapshot_path}")
+    finally:
+        audit_logger.log(
+            AuditEvent(
+                timestamp=datetime.now(),
+                event_type="cli.snapshot.create",
+                project_name=project_name,
+                command="snapshot create",
+                args={
+                    "path": path,
+                    "format": format,
+                    "output": output,
+                    "compress": compress,
+                    "language": language,
+                },
+            )
+        )
 
 @snapshot.command('list')
 def list_snapshots():

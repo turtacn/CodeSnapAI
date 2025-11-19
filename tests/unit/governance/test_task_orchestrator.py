@@ -19,6 +19,7 @@ def create_mock_plan() -> GovernancePlan:
                 tasks=[
                     GovernanceTask(
                         id="task1",
+                        project_name="test_project",
                         file_path="test.py",
                         language="python",
                         rule_id="rule1",
@@ -28,6 +29,7 @@ def create_mock_plan() -> GovernancePlan:
                     ),
                     GovernanceTask(
                         id="task2",
+                        project_name="test_project",
                         file_path="test.go",
                         language="go",
                         rule_id="rule2",
@@ -59,6 +61,7 @@ def test_orchestrator_batching():
         plan.groups[0].tasks.append(
             GovernanceTask(
                 id=f"task_extra_{i}",
+                project_name="test_project",
                 file_path="test.py",
                 language="python",
                 rule_id="rule_extra",
