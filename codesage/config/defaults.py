@@ -6,6 +6,7 @@ from codesage.config.governance import GovernanceConfig
 from codesage.config.jules import JulesPromptConfig
 from codesage.config.web import WebConsoleConfig
 from codesage.config.history import HistoryConfig
+from codesage.config.org import OrgConfig
 
 DEFAULT_CONFIG = {
     "languages": {
@@ -28,4 +29,5 @@ DEFAULT_CONFIG = {
     "jules": JulesPromptConfig.default().dict(),
     "web": WebConsoleConfig.default().dict(),
     "history": HistoryConfig.default().dict(),
+    "org": OrgConfig.default().dict(),
 }

@@ -14,6 +14,7 @@ from .commands.web_console import web_console_command
 from .commands.history_snapshot import history_snapshot_command
 from .commands.history_diff import history_diff_command
 from .commands.history_trend import history_trend_command
+from .commands.org_report import org_report
 from .plugin_loader import load_plugins
 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
@@ -39,6 +40,7 @@ main.add_command(web_console_command)
 main.add_command(history_snapshot_command)
 main.add_command(history_diff_command)
 main.add_command(history_trend_command)
+main.add_command(org_report)
 
 # Load plugin commands
 load_plugins(main)

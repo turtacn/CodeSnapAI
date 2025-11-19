@@ -5,12 +5,16 @@ from typing import List, Optional
 
 from codesage.config.web import WebConsoleConfig
 from codesage.web.loader import load_snapshot, load_report, load_governance_plan
+from codesage.config.loader import load_config
+from codesage.config.org import OrgConfig
+from codesage.org.aggregator import OrgAggregator
 from codesage.web.api_models import (
     ApiProjectSummary,
     ApiFileListItem,
     ApiFileDetail,
     ApiGovernanceTask,
 )
+from codesage.web.org_api_models import ApiOrgProjectItem, ApiOrgReport
 from codesage.governance.task_models import GovernancePlan
 from codesage.jules.prompt_builder import JulesPromptConfig, build_prompt
 from codesage.governance.jules_bridge import build_view_and_template_for_task
@@ -132,6 +136,69 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
             return {"task_id": task_id, "prompt": prompt}
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Snapshot or governance plan not found")
+
+    @app.get("/api/org/projects", response_model=List[ApiOrgProjectItem])
+    def list_org_projects():
+        try:
+            full_config = load_config(Path.cwd())
+            org_config = OrgConfig.parse_obj(full_config.get("org", {}))
+            if not org_config.projects:
+                return []
+
+            aggregator = OrgAggregator(org_config)
+            overview = aggregator.aggregate()
+
+            items = []
+            for h in overview.projects:
+                items.append(
+                    ApiOrgProjectItem(
+                        id=h.project.id,
+                        name=h.project.name,
+                        tags=h.project.tags,
+                        health_score=h.health_score,
+                        risk_level=h.risk_level,
+                        high_risk_files=h.high_risk_files,
+                        total_issues=h.total_issues,
+                        has_recent_regression=h.has_recent_regression,
+                    )
+                )
+            return items
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load organization projects: {e}")
+
+    @app.get("/api/org/report", response_model=ApiOrgReport)
+    def get_org_report():
+        try:
+            full_config = load_config(Path.cwd())
+            org_config = OrgConfig.parse_obj(full_config.get("org", {}))
+            if not org_config.projects:
+                raise HTTPException(status_code=404, detail="No projects configured for the organization.")
+
+            aggregator = OrgAggregator(org_config)
+            overview = aggregator.aggregate()
+
+            items = [
+                ApiOrgProjectItem(
+                    id=h.project.id,
+                    name=h.project.name,
+                    tags=h.project.tags,
+                    health_score=h.health_score,
+                    risk_level=h.risk_level,
+                    high_risk_files=h.high_risk_files,
+                    total_issues=h.total_issues,
+                    has_recent_regression=h.has_recent_regression,
+                )
+                for h in overview.projects
+            ]
+
+            return ApiOrgReport(
+                total_projects=overview.total_projects,
+                projects_with_regressions=overview.projects_with_regressions,
+                avg_health_score=overview.avg_health_score,
+                projects=items,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to generate organization report: {e}")
 
     # Serve the frontend
     ui_dir = Path(__file__).parent / "ui" / "build"

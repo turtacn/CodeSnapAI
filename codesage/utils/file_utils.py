@@ -2,6 +2,7 @@ import hashlib
 from pathlib import Path
 from typing import List, Any, Dict
 import yaml
+import json
 from gitignore_parser import parse_gitignore
 
 
@@ -15,6 +16,12 @@ def write_yaml_file(data: Dict[str, Any], path: Path) -> None:
     """Writes a dictionary to a YAML file."""
     with open(path, "w", encoding="utf-8") as f:
         yaml.dump(data, f, indent=2)
+
+
+def read_json_file(path: Path) -> Dict[str, Any]:
+    """Reads a JSON file and returns its content as a dictionary."""
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def scan_directory(path: str, exclude_patterns: List[str] = None) -> List[Path]:
