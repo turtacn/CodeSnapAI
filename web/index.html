@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeSnapAI - AI 语义代码分析与智能治理平台</title>
+    <!-- 外部 CDN 资源 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script>
+    <!-- Tailwind 自定义配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1', // 主紫
+                        secondary: '#10b981', // 次绿
+                        accent: '#f97316',    // 强调橙
+                        dark: '#0f172a',      // 深灰蓝
+                        darker: '#030712',    // 近黑
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'bounce-slow': 'bounce 3s infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-12px)' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 10px rgba(99, 102, 241, 0.6), 0 0 20px rgba(16, 185, 129, 0.3)' },
+                            '100%': { boxShadow: '0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(16, 185, 129, 0.5), 0 0 40px rgba(249, 115, 22, 0.2)' },
+                        }
+                    }
+                },
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-gradient {
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            .bg-grid {
+                background-image: radial-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px);
+                background-size: 24px 24px;
+            }
+            .glass {
+                backdrop-filter: blur(12px);
+                background-color: rgba(15, 23, 42, 0.85);
+            }
+            .code-block {
+                background-color: rgba(3, 7, 18, 0.9);
+                border: 1px solid rgba(99, 102, 241, 0.2);
+            }
+            .text-shadow-glow {
+                text-shadow: 0 0 15px rgba(99, 102, 241, 0.7);
+            }
+            .clipboard-btn {
+                transition: all 0.2s ease;
+            }
+            .copy-toast {
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            .copy-toast.show {
+                opacity: 1;
+            }
+        }
+    </style>
+    <style>
+        /* 粒子背景容器 */
+        #particles-js {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        /* 平滑滚动 */
+        html {
+            scroll-behavior: smooth;
+        }
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030712;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #6366f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #818cf8;
+        }
+        /* 语言切换过渡 */
+        [data-lang] {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="font-inter bg-darker text-light overflow-x-hidden">
+<!-- 粒子背景 -->
+<div id="particles-js"></div>
+
+<!-- 语言切换开关 (默认中文高亮) -->
+<div class="fixed top-4 right-4 z-50 glass rounded-full px-3 py-2 border border-primary/30 shadow-lg">
+    <button id="lang-en" class="px-3 py-1 rounded text-gray-300 text-sm font-medium">EN</button>
+    <button id="lang-zh" class="px-3 py-1 rounded bg-primary text-white text-sm font-medium">中</button>
+</div>
+
+<!-- 导航栏 -->
+<nav class="glass sticky top-0 z-40 border-b border-primary/20">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center animate-glow">
+                <i class="fa fa-code text-white text-xl"></i>
+            </div>
+            <span class="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-secondary text-gradient text-shadow-glow">CodeSnapAI</span>
+        </div>
+
+        <div class="hidden md:flex space-x-8 items-center">
+            <a href="#problem" class="hover:text-primary transition-colors" data-lang="nav-problem">核心问题</a>
+            <a href="#pain" class="hover:text-primary transition-colors" data-lang="nav-pain">实际痛点</a>
+            <a href="#value" class="hover:text-primary transition-colors" data-lang="nav-value">核心价值</a>
+            <a href="#quickstart" class="hover:text-primary transition-colors" data-lang="nav-quickstart">快速开始</a>
+            <a href="#effect" class="hover:text-primary transition-colors" data-lang="nav-effect">实际效果</a>
+            <a href="#vision" class="hover:text-primary transition-colors" data-lang="nav-vision">长期愿景</a>
+            <a href="#quickstart" class="bg-primary hover:bg-primary/80 text-white px-5 py-2 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 animate-glow" data-lang="nav-start">立即使用</a>
+        </div>
+
+        <!-- 移动端菜单按钮 -->
+        <button class="md:hidden text-2xl text-primary">
+            <i class="fa fa-bars"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- 英雄区：核心定位 -->
+<section class="min-h-[85vh] flex items-center relative z-10 pt-10">
+    <div class="container mx-auto px-4 py-20">
+        <div class="grid md:grid-cols-2 gap-12 items-center">
+            <div class="space-y-8">
+                <div class="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-medium" data-lang="hero-tag">
+                    AI 驱动的语义代码分析与智能治理平台
+                </div>
+                <h1 class="text-4xl md:text-6xl font-bold leading-tight">
+                    <span data-lang="hero-title-1">破解现代编码中的</span>
+                    <span class="bg-gradient-to-r from-primary to-secondary text-gradient text-shadow-glow" data-lang="hero-title-2">上下文悖论</span>
+                    <br>
+                    <span data-lang="hero-title-3"></span>
+                </h1>
+                <p class="text-xl text-gray-300 leading-relaxed" data-lang="hero-desc">
+                    将5MB以上的代码库压缩为小于200KB的语义快照，同时保留95%以上的调试关键信息。以前所未有的规模赋能AI辅助开发。
+                </p>
+                <div class="flex flex-wrap gap-4 pt-4">
+                    <a href="#quickstart" class="bg-primary hover:bg-primary/80 text-white px-8 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 font-medium flex items-center gap-2 animate-glow">
+                        <span data-lang="btn-start">快速开始</span>
+                        <i class="fa fa-rocket"></i>
+                    </a>
+                    <a href="#problem" class="bg-transparent border border-primary/50 hover:border-primary text-white px-8 py-3 rounded-lg transition-all duration-300 flex items-center gap-2">
+                        <span data-lang="btn-learn">了解更多</span>
+                        <i class="fa fa-chevron-down"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 视觉演示卡片 -->
+            <div class="relative">
+                <div class="absolute inset-0 bg-gradient-to-tr from-primary/30 to-secondary/30 rounded-3xl blur-3xl opacity-30 animate-pulse-slow"></div>
+                <div class="relative glass border border-primary/20 rounded-2xl p-6 shadow-xl animate-float">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <div class="text-sm text-gray-300" data-lang="demo-title">核心价值演示</div>
+                    </div>
+
+                    <!-- 压缩对比 -->
+                    <div class="space-y-6">
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span data-lang="demo-original">原始代码库</span>
+                                <span>5MB+</span>
+                            </div>
+                            <div class="h-8 code-block rounded-lg overflow-hidden">
+                                <div class="h-full bg-gray-600 w-full"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-center">
+                            <i class="fa fa-arrow-down text-primary/70 animate-bounce-slow text-xl"></i>
+                        </div>
+
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span data-lang="demo-snapshot">语义快照</span>
+                                <span>&lt;200KB (20:1 压缩比)</span>
+                            </div>
+                            <div class="h-8 code-block rounded-lg overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-primary to-secondary w-[4%]"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex items-center justify-center gap-2 text-secondary text-sm">
+                            <i class="fa fa-check-circle"></i>
+                            <span data-lang="demo-retention">保留95%以上的调试关键信息</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-darker to-transparent"></div>
+</section>
+
+<!-- 1. 瞄准的核心问题 -->
+<section id="problem" class="py-20 relative z-10">
+    <div class="container mx-auto px-4">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-medium mb-4" data-lang="problem-tag">
+                瞄准的核心问题
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-lang="problem-title">现代软件工程的核心困境</h2>
+            <p class="text-gray-300 text-lg" data-lang="problem-desc">
+                随着代码库呈指数级增长，我们面临着传统工具无法解决的悖论
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-10 items-center">
+            <div class="glass border border-primary/20 rounded-2xl p-8 hover:shadow-lg hover:shadow-primary/10 transition-all">
+                <div class="flex items-start gap-4 mb-6">
+                    <div class="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                        <i class="fa fa-expand text-primary text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2" data-lang="problem-1-title">上下文爆炸</h3>
+                        <p class="text-gray-300" data-lang="problem-1-desc">
+                            现代项目包含数百万行代码、数百个依赖项和复杂的调用图。AI模型和开发人员被海量信息淹没，无法高效聚焦核心逻辑。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                        <i class="fa fa-compress text-primary text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2" data-lang="problem-2-title">信息丢失</h3>
+                        <p class="text-gray-300" data-lang="problem-2-desc">
+                            传统的摘要和压缩工具会丢失关键的语义关系、错误模式和依赖链——而这些正是调试和治理所需的核心信息，导致分析结果失去价值。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 问题可视化图表 -->
+            <div class="glass border border-primary/20 rounded-2xl p-6">
+                <canvas id="problemChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 2. 切实痛点 -->
+<section id="pain" class="py-20 relative z-10 bg-dark/30">
+    <div class="container mx-auto px-4">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-block px-4 py-2 rounded-full bg-accent/20 text-accent text-sm font-medium mb-4" data-lang="pain-tag">
+                开发团队的实际痛点
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-lang="pain-title">开发者每天都在面对的效率瓶颈</h2>
+            <p class="text-gray-300 text-lg" data-lang="pain-desc">
+                工程师平均30%的工作时间浪费在可避免的问题上，而CodeSnapAI从根源上解决这些痛点
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- 痛点1 -->
+            <div class="glass border border-accent/20 rounded-xl p-6 hover:border-accent/40 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-accent/20 flex items-center justify-center mb-5 group-hover:bg-accent/30 transition-all">
+                    <i class="fa fa-clock-o text-accent text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="pain-1-title">调试效率低下</h3>
+                <p class="text-gray-300" data-lang="pain-1-desc">
+                    花费数小时追踪调用链和理解陌生代码库，定位一个bug平均耗时超过2小时
+                </p>
+            </div>
+
+            <!-- 痛点2 -->
+            <div class="glass border border-accent/20 rounded-xl p-6 hover:border-accent/40 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-accent/20 flex items-center justify-center mb-5 group-hover:bg-accent/30 transition-all">
+                    <i class="fa fa-exclamation-triangle text-accent text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="pain-2-title">风险视觉盲区</h3>
+                <p class="text-gray-300" data-lang="pain-2-desc">
+                    大型项目中遗漏高风险代码模式和隐藏依赖，生产环境突发故障频发
+                </p>
+            </div>
+
+            <!-- 痛点3 -->
+            <div class="glass border border-accent/20 rounded-xl p-6 hover:border-accent/40 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-accent/20 flex items-center justify-center mb-5 group-hover:bg-accent/30 transition-all">
+                    <i class="fa fa-repeat text-accent text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="pain-3-title">分析工具低效</h3>
+                <p class="text-gray-300" data-lang="pain-3-desc">
+                    运行缓慢、资源密集的静态分析工具，最终只生成大量无法落地的报告
+                </p>
+            </div>
+
+            <!-- 痛点4 -->
+            <div class="glass border border-accent/20 rounded-xl p-6 hover:border-accent/40 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-accent/20 flex items-center justify-center mb-5 group-hover:bg-accent/30 transition-all">
+                    <i class="fa fa-code-fork text-accent text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="pain-4-title">语言工具孤岛</h3>
+                <p class="text-gray-300" data-lang="pain-4-desc">
+                    每种语言使用单独的分析工具，工作流碎片化，团队协作成本高
+                </p>
+            </div>
+        </div>
+
+        <!-- 痛点数据统计 -->
+        <div class="mt-12 glass border border-accent/20 rounded-2xl p-6">
+            <div class="grid md:grid-cols-3 gap-6 text-center">
+                <div class="p-4">
+                    <div class="text-4xl font-bold text-accent mb-2">70%</div>
+                    <p class="text-gray-300" data-lang="pain-stat-1">调试时间浪费在上下文理解上</p>
+                </div>
+                <div class="p-4">
+                    <div class="text-4xl font-bold text-accent mb-2">85%</div>
+                    <p class="text-gray-300" data-lang="pain-stat-2">团队使用3种以上不同的代码分析工具</p>
+                </div>
+                <div class="p-4">
+                    <div class="text-4xl font-bold text-accent mb-2">40%</div>
+                    <p class="text-gray-300" data-lang="pain-stat-3">因工具切换导致的生产力下降</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 3. 想象力价值 -->
+<section id="value" class="py-20 relative z-10">
+    <div class="container mx-auto px-4">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-block px-4 py-2 rounded-full bg-secondary/20 text-secondary text-sm font-medium mb-4" data-lang="value-tag">
+                颠覆性核心价值
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-lang="value-title">解锁代码开发的无限可能</h2>
+            <p class="text-gray-300 text-lg" data-lang="value-desc">
+                CodeSnapAI 不仅是一个工具，更是我们与代码交互方式的范式转变
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8">
+            <!-- 价值1 -->
+            <div class="glass border border-secondary/20 rounded-xl p-6 hover:shadow-lg hover:shadow-secondary/10 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-all">
+                    <i class="fa fa-bolt text-secondary text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="value-1-title">AI 能力超级增强</h3>
+                <p class="text-gray-300 mb-4" data-lang="value-1-desc">
+                    让大语言模型突破上下文窗口限制，真正理解整个代码库，从"代码补全工具"升级为"全流程开发伙伴"。
+                </p>
+                <div class="text-sm text-secondary/80">
+                    <i class="fa fa-lightbulb-o mr-1"></i>
+                    <span data-lang="value-1-tip">AI 辅助调试速度提升10倍</span>
+                </div>
+            </div>
+
+            <!-- 价值2 -->
+            <div class="glass border border-secondary/20 rounded-xl p-6 hover:shadow-lg hover:shadow-secondary/10 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-all">
+                    <i class="fa fa-shield text-secondary text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="value-2-title">主动式代码治理</h3>
+                <p class="text-gray-300 mb-4" data-lang="value-2-desc">
+                    提前预测并预防生产环境问题，通过AI驱动的风险检测和自动修复，将质量管控从"事后补救"变为"事前预防"。
+                </p>
+                <div class="text-sm text-secondary/80">
+                    <i class="fa fa-lightbulb-o mr-1"></i>
+                    <span data-lang="value-2-tip">生产环境BUG减少60%</span>
+                </div>
+            </div>
+
+            <!-- 价值3 -->
+            <div class="glass border border-secondary/20 rounded-xl p-6 hover:shadow-lg hover:shadow-secondary/10 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-all">
+                    <i class="fa fa-globe text-secondary text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="value-3-title">跨语言统一理解</h3>
+                <p class="text-gray-300 mb-4" data-lang="value-3-desc">
+                    通过通用语义层打破语言孤岛，一套工具支持Go、Java、Rust、Python等主流语言，统一多语言项目的分析标准。
+                </p>
+                <div class="text-sm text-secondary/80">
+                    <i class="fa fa-lightbulb-o mr-1"></i>
+                    <span data-lang="value-3-tip">单一工具处理全栈多语言项目</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 核心价值标语 -->
+        <div class="mt-16 text-center">
+            <p class="text-2xl md:text-3xl font-bold text-gradient bg-gradient-to-r from-primary to-secondary text-shadow-glow" data-lang="value-slogan">
+                从被动调试到主动的代码掌控
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- 4. Quick Start 快速开始 -->
+<section id="quickstart" class="py-20 relative z-10 bg-dark/30">
+    <div class="container mx-auto px-4">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-medium mb-4" data-lang="quickstart-tag">
+                快速开始
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-lang="quickstart-title">3个简单步骤，即刻上手</h2>
+            <p class="text-gray-300 text-lg" data-lang="quickstart-desc">
+                通过直观的命令行界面，几分钟内即可开始分析你的代码库
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8">
+            <!-- 步骤1 -->
+            <div class="glass border border-primary/20 rounded-xl p-6 hover:border-primary/40 transition-all">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold mb-5">1</div>
+                <h3 class="text-xl font-bold mb-4" data-lang="step-1-title">安装 CodeSnapAI</h3>
+                <div class="code-block rounded-lg p-4 mb-4 relative">
+                    <button class="clipboard-btn absolute top-2 right-2 text-gray-400 hover:text-primary" data-clipboard-target="#step1-code">
+                        <i class="fa fa-copy"></i>
+                    </button>
+                    <pre id="step1-code" class="text-xs md:text-sm text-gray-300 font-mono"><code>pip install codesnapai
+# 或从源码安装
+git clone https://github.com/turtacn/CodeSnapAI.git
+cd CodeSnapAI
+poetry install</code></pre>
+                    <div class="copy-toast absolute top-2 right-8 text-xs text-secondary">已复制！</div>
+                </div>
+                <p class="text-gray-300 text-sm" data-lang="step-1-desc">
+                    要求 Python 3.10+ 版本，Git（用于仓库分析功能）
+                </p>
+            </div>
+
+            <!-- 步骤2 -->
+            <div class="glass border border-primary/20 rounded-xl p-6 hover:border-primary/40 transition-all">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold mb-5">2</div>
+                <h3 class="text-xl font-bold mb-4" data-lang="step-2-title">分析你的代码库</h3>
+                <div class="code-block rounded-lg p-4 mb-4 relative">
+                    <button class="clipboard-btn absolute top-2 right-2 text-gray-400 hover:text-primary" data-clipboard-target="#step2-code">
+                        <i class="fa fa-copy"></i>
+                    </button>
+                    <pre id="step2-code" class="text-xs md:text-sm text-gray-300 font-mono"><code># 初始化配置
+codesnapai config init --interactive
+
+# 分析项目
+codesnapai analyze ./your-project</code></pre>
+                    <div class="copy-toast absolute top-2 right-8 text-xs text-secondary">已复制！</div>
+                </div>
+                <p class="text-gray-300 text-sm" data-lang="step-2-desc">
+                    分析器自动检测项目语言，并生成完整的语义模型
+                </p>
+            </div>
+
+            <!-- 步骤3 -->
+            <div class="glass border border-primary/20 rounded-xl p-6 hover:border-primary/40 transition-all">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold mb-5">3</div>
+                <h3 class="text-xl font-bold mb-4" data-lang="step-3-title">生成快照并调试</h3>
+                <div class="code-block rounded-lg p-4 mb-4 relative">
+                    <button class="clipboard-btn absolute top-2 right-2 text-gray-400 hover:text-primary" data-clipboard-target="#step3-code">
+                        <i class="fa fa-copy"></i>
+                    </button>
+                    <pre id="step3-code" class="text-xs md:text-sm text-gray-300 font-mono"><code># 创建语义快照
+codesnapai snapshot create -o snapshot.yaml
+
+# 自然语言调试
+codesnapai debug snapshot.yaml "为什么TestLogin测试失败？"</code></pre>
+                    <div class="copy-toast absolute top-2 right-8 text-xs text-secondary">已复制！</div>
+                </div>
+                <p class="text-gray-300 text-sm" data-lang="step-3-desc">
+                    获取AI驱动的问题洞察和可直接落地的代码修复方案
+                </p>
+            </div>
+        </div>
+
+        <!-- Web Console 快速入口 -->
+        <div class="mt-12 glass border border-primary/20 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+                <h3 class="text-2xl font-bold mb-2" data-lang="console-title">可视化 Web 控制台</h3>
+                <p class="text-gray-300" data-lang="console-desc">启动Web仪表板，可视化分析结果并管理代码治理任务</p>
+            </div>
+            <div class="code-block rounded-lg p-3 relative">
+                <button class="clipboard-btn absolute top-2 right-2 text-gray-400 hover:text-primary" data-clipboard-target="#console-code">
+                    <i class="fa fa-copy"></i>
+                </button>
+                <pre id="console-code" class="text-sm text-gray-300 font-mono"><code>codesnapai web-console</code></pre>
+                <div class="copy-toast absolute top-2 right-8 text-xs text-secondary">已复制！</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 5. 实际效果 -->
+<section id="effect" class="py-20 relative z-10">
+    <div class="container mx-auto px-4">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-medium mb-4" data-lang="effect-tag">
+                实际落地效果
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-lang="effect-title">经过生产环境验证的核心性能</h2>
+            <p class="text-gray-300 text-lg" data-lang="effect-desc">
+                在100+开源和企业项目中测试，带来可量化的效率提升
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-10">
+            <!-- 效果图表 -->
+            <div class="glass border border-primary/20 rounded-2xl p-6">
+                <canvas id="effectChart" width="400" height="300"></canvas>
+            </div>
+
+            <!-- 效果数据卡片 -->
+            <div class="grid grid-rows-2 gap-6">
+                <div class="glass border border-primary/20 rounded-xl p-6 flex items-center gap-6">
+                    <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl font-bold">20:1</div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-1" data-lang="effect-1-title">行业领先压缩比</h3>
+                        <p class="text-gray-300" data-lang="effect-1-desc">代码库语义压缩技术，体积减少95%仍保留核心信息</p>
+                    </div>
+                </div>
+
+                <div class="glass border border-primary/20 rounded-xl p-6 flex items-center gap-6">
+                    <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl font-bold">95%+</div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-1" data-lang="effect-2-title">关键信息保留率</h3>
+                        <p class="text-gray-300" data-lang="effect-2-desc">完整保留调试所需的代码关系、依赖链和错误模式</p>
+                    </div>
+                </div>
+
+                <div class="glass border border-primary/20 rounded-xl p-6 flex items-center gap-6">
+                    <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl font-bold">&lt;30s</div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-1" data-lang="effect-3-title">极速分析速度</h3>
+                        <p class="text-gray-300" data-lang="effect-3-desc">30秒内完成10万行代码项目的全量语义分析</p>
+                    </div>
+                </div>
+
+                <div class="glass border border-primary/20 rounded-xl p-6 flex items-center gap-6">
+                    <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl font-bold">5+</div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-1" data-lang="effect-4-title">多语言统一支持</h3>
+                        <p class="text-gray-300" data-lang="effect-4-desc">覆盖Go、Java、C/C++、Rust、Python主流开发语言</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 客户评价 -->
+        <div class="mt-16 glass border border-primary/20 rounded-2xl p-8">
+            <div class="flex flex-col md:flex-row gap-8 items-center">
+                <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-primary">
+                    <img src="https://picsum.photos/id/1/100/100" alt="用户头像" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <p class="text-xl text-gray-200 italic mb-4" data-lang="testimonial">
+                        "【愿景】CodeSnapAI将我们的调试时间减少了70%，还帮我们发现了12个传统工具遗漏的关键风险点。现在它已经成为我们CI/CD流水线的核心组成部分，是大型项目开发的必备工具。"
+                    </p>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-bold text-white">Alex Johnson</span>
+                        <span class="text-gray-400" data-lang="testimonial-role">TechCorp 高级工程负责人</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 6. 长期愿景 -->
+<section id="vision" class="py-20 relative z-10 bg-dark/30">
+    <div class="container mx-auto px-4">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-block px-4 py-2 rounded-full bg-secondary/20 text-secondary text-sm font-medium mb-4" data-lang="vision-tag">
+                长期发展愿景
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-lang="vision-title">代码智能的未来演进</h2>
+            <p class="text-gray-300 text-lg" data-lang="vision-desc">
+                CodeSnapAI 正逐步进化为终极的 AI 原生代码智能平台
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8">
+            <!-- 愿景1 -->
+            <div class="glass border border-secondary/20 rounded-xl p-6 hover:shadow-lg hover:shadow-secondary/10 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-all">
+                    <i class="fa fa-robot text-secondary text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="vision-1-title">自主代码修复</h3>
+                <p class="text-gray-300" data-lang="vision-1-desc">
+                    从问题检测到代码修复、测试、验证的全流程自动化，对常见问题实现零人工干预的端到端解决方案。
+                </p>
+            </div>
+
+            <!-- 愿景2 -->
+            <div class="glass border border-secondary/20 rounded-xl p-6 hover:shadow-lg hover:shadow-secondary/10 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-all">
+                    <i class="fa fa-network-wired text-secondary text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="vision-2-title">全球代码知识图</h3>
+                <p class="text-gray-300" data-lang="vision-2-desc">
+                    构建去中心化的开源代码语义图谱，实现跨仓库的代码理解和依赖风险预测，打造全球开发者的共享知识底座。
+                </p>
+            </div>
+
+            <!-- 愿景3 -->
+            <div class="glass border border-secondary/20 rounded-xl p-6 hover:shadow-lg hover:shadow-secondary/10 transition-all group">
+                <div class="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-all">
+                    <i class="fa fa-brain text-secondary text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-3" data-lang="vision-3-title">代码推理AGI</h3>
+                <p class="text-gray-300" data-lang="vision-3-desc">
+                    打造真正理解代码意图的人工智能，能够重构整个系统架构，并根据业务目标提供最优的技术实现方案。
+                </p>
+            </div>
+        </div>
+
+        <!-- 发展路线图 -->
+        <div class="mt-16 glass border border-secondary/20 rounded-2xl p-8">
+            <h3 class="text-2xl font-bold mb-6 text-center" data-lang="roadmap-title">思路发展路线图</h3>
+            <div class="relative">
+                <!-- 时间轴线 -->
+                <div class="absolute left-0 md:left-1/2 top-0 bottom-0 w-0.5 bg-primary/30 transform md:translate-x-px"></div>
+
+                <!-- 2025 -->
+                <div class="relative mb-12 flex flex-col md:flex-row items-start gap-6">
+                    <div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold absolute left-0 md:left-1/2 transform -translate-x-6 md:-translate-x-6 z-10">2025</div>
+                    <div class="md:w-1/2 md:ml-auto md:pr-12 glass rounded-xl p-4 ml-12 md:ml-0">
+                        <h4 class="text-xl font-bold mb-2 text-primary" data-lang="roadmap-2025-title">第一阶段：能力增强</h4>
+                        <ul class="text-gray-300 space-y-2">
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2025-1">完善TypeScript/JavaScript全量支持</span></li>
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2025-2">推出VS Code/IntelliJ IDE原生插件</span></li>
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2025-3">新增企业级安全合规检测功能</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 2026 -->
+                <div class="relative mb-12 flex flex-col md:flex-row items-start gap-6">
+                    <div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold absolute left-0 md:left-1/2 transform -translate-x-6 md:-translate-x-6 z-10">2026</div>
+                    <div class="md:w-1/2 md:pl-12 glass rounded-xl p-4 ml-12 md:ml-0">
+                        <h4 class="text-xl font-bold mb-2 text-primary" data-lang="roadmap-2026-title">第二阶段：生态扩展</h4>
+                        <ul class="text-gray-300 space-y-2">
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2026-1">构建跨仓库代码语义图谱</span></li>
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2026-2">AI驱动的架构优化建议功能</span></li>
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2026-3">自动化代码重构工作流</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 2027+ -->
+                <div class="relative flex flex-col md:flex-row items-start gap-6">
+                    <div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold absolute left-0 md:left-1/2 transform -translate-x-6 md:-translate-x-6 z-10">2027+</div>
+                    <div class="md:w-1/2 md:ml-auto md:pr-12 glass rounded-xl p-4 ml-12 md:ml-0">
+                        <h4 class="text-xl font-bold mb-2 text-primary" data-lang="roadmap-2027-title">第三阶段：范式变革</h4>
+                        <ul class="text-gray-300 space-y-2">
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2027-1">全自动化代码修复系统</span></li>
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2027-2">代码推理AGI能力集成</span></li>
+                            <li><i class="fa fa-check-circle text-secondary mr-2"></i><span data-lang="roadmap-2027-3">去中心化代码知识网络</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA 行动召唤 -->
+<section class="py-20 relative z-10">
+    <div class="container mx-auto px-4">
+        <div class="glass border border-primary/20 rounded-3xl p-10 text-center">
+            <h2 class="text-3xl md:text-5xl font-bold mb-6" data-lang="cta-title">准备好变革你的代码开发工作流了吗？</h2>
+            <p class="text-xl text-gray-300 mb-10 max-w-2xl mx-auto" data-lang="cta-desc">
+                加入数千名开发者的行列，使用CodeSnapAI写出更优质的代码，提升开发效率。
+            </p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="#quickstart" class="bg-primary hover:bg-primary/80 text-white px-8 py-4 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 font-medium text-lg animate-glow">
+                    <span data-lang="cta-btn-1">免费开始使用</span>
+                </a>
+                <a href="https://github.com/turtacn/CodeSnapAI" target="_blank" class="bg-darker border border-primary/50 hover:border-primary text-white px-8 py-4 rounded-lg transition-all duration-300 font-medium text-lg flex items-center gap-2">
+                    <i class="fa fa-github"></i>
+                    <span data-lang="cta-btn-2">在GitHub上思路</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 页脚 -->
+<footer class="py-12 relative z-10 bg-darker border-t border-primary/10">
+    <div class="container mx-auto px-4">
+        <div class="grid md:grid-cols-4 gap-8 mb-8">
+            <div class="md:col-span-1">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                        <i class="fa fa-code text-white text-xl"></i>
+                    </div>
+                    <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary text-gradient">CodeSnapAI</span>
+                </div>
+                <p class="text-gray-400 text-sm mb-4" data-lang="footer-desc">
+                    AI驱动的语义代码分析与智能治理平台，让代码开发更高效、更安全。
+                </p>
+                <div class="flex gap-4">
+                    <a href="https://github.com/turtacn/CodeSnapAI" class="text-gray-400 hover:text-primary transition-colors">
+                        <i class="fa fa-github text-xl"></i>
+                    </a>
+                    <a href="https://github.com/turtacn/CodeSnapAI" class="text-gray-400 hover:text-primary transition-colors">
+                        <i class="fa fa-twitter text-xl"></i>
+                    </a>
+                    <a href="https://github.com/turtacn/CodeSnapAI" class="text-gray-400 hover:text-primary transition-colors">
+                        <i class="fa fa-linkedin text-xl"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-lg font-bold mb-4 text-white" data-lang="footer-links-1">思路</h4>
+                <ul class="space-y-2 text-gray-400">
+                    <li><a href="#features" class="hover:text-primary transition-colors" data-lang="footer-link-1-1">核心功能</a></li>
+                    <li><a href="#quickstart" class="hover:text-primary transition-colors" data-lang="footer-link-1-2">快速开始</a></li>
+                    <li><a href="#effect" class="hover:text-primary transition-colors" data-lang="footer-link-1-3">落地效果</a></li>
+                    <li><a href="#vision" class="hover:text-primary transition-colors" data-lang="footer-link-1-4">发展路线</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-lg font-bold mb-4 text-white" data-lang="footer-links-2">资源</h4>
+                <ul class="space-y-2 text-gray-400">
+                    <li><a href="https://github.com/turtacn/CodeSnapAI" class="hover:text-primary transition-colors" data-lang="footer-link-2-1">文档中心</a></li>
+                    <li><a href="https://github.com/turtacn/CodeSnapAI" class="hover:text-primary transition-colors" data-lang="footer-link-2-2">API参考</a></li>
+                    <li><a href="https://github.com/turtacn/CodeSnapAI" class="hover:text-primary transition-colors" data-lang="footer-link-2-3">教程指南</a></li>
+                    <li><a href="https://github.com/turtacn/CodeSnapAI" class="hover:text-primary transition-colors" data-lang="footer-link-2-4">技术支持</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="mt-8 pt-8 border-t border-primary/10 text-center text-gray-500 text-sm">
+            <p data-lang="footer-copyright">© 2025 CodeSnapAI 贡献者保留所有权利。基于 Apache 2.0 协议开源。</p>
+        </div>
+    </div>
+</footer>
+
+<!-- JavaScript 核心逻辑 -->
+<script>
+    // 1. 语言包定义
+    const langPackage = {
+        zh: {
+            // 导航
+            "nav-problem": "核心问题",
+            "nav-pain": "实际痛点",
+            "nav-value": "核心价值",
+            "nav-quickstart": "快速开始",
+            "nav-effect": "实际效果",
+            "nav-vision": "长期愿景",
+            "nav-start": "立即使用",
+            // 英雄区
+            "hero-tag": "AI 驱动的语义代码分析与智能治理平台",
+            "hero-title-1": "破解现代编码中的",
+            "hero-title-2": "上下文悖论",
+            "hero-title-3": "",
+            "hero-desc": "将5MB以上的代码库压缩为小于200KB的语义快照，同时保留95%以上的调试关键信息。以前所未有的规模赋能AI辅助开发。",
+            "btn-start": "快速开始",
+            "btn-learn": "了解更多",
+            "demo-title": "核心价值演示",
+            "demo-original": "原始代码库",
+            "demo-snapshot": "语义快照",
+            "demo-retention": "保留95%以上的调试关键信息",
+            // 核心问题
+            "problem-tag": "瞄准的核心问题",
+            "problem-title": "现代软件工程的核心困境",
+            "problem-desc": "随着代码库呈指数级增长，我们面临着传统工具无法解决的悖论",
+            "problem-1-title": "上下文爆炸",
+            "problem-1-desc": "现代项目包含数百万行代码、数百个依赖项和复杂的调用图。AI模型和开发人员被海量信息淹没，无法高效聚焦核心逻辑。",
+            "problem-2-title": "信息丢失",
+            "problem-2-desc": "传统的摘要和压缩工具会丢失关键的语义关系、错误模式和依赖链——而这些正是调试和治理所需的核心信息，导致分析结果失去价值。",
+            // 实际痛点
+            "pain-tag": "开发团队的实际痛点",
+            "pain-title": "开发者每天都在面对的效率瓶颈",
+            "pain-desc": "工程师平均30%的工作时间浪费在可避免的问题上，而CodeSnapAI从根源上解决这些痛点",
+            "pain-1-title": "调试效率低下",
+            "pain-1-desc": "花费数小时追踪调用链和理解陌生代码库，定位一个bug平均耗时超过2小时",
+            "pain-2-title": "风险视觉盲区",
+            "pain-2-desc": "大型项目中遗漏高风险代码模式和隐藏依赖，生产环境突发故障频发",
+            "pain-3-title": "分析工具低效",
+            "pain-3-desc": "运行缓慢、资源密集的静态分析工具，最终只生成大量无法落地的报告",
+            "pain-4-title": "语言工具孤岛",
+            "pain-4-desc": "每种语言使用单独的分析工具，工作流碎片化，团队协作成本高",
+            "pain-stat-1": "调试时间浪费在上下文理解上",
+            "pain-stat-2": "团队使用3种以上不同的代码分析工具",
+            "pain-stat-3": "因工具切换导致的生产力下降",
+            // 核心价值
+            "value-tag": "颠覆性核心价值",
+            "value-title": "解锁代码开发的无限可能",
+            "value-desc": "CodeSnapAI 不仅是一个工具，更是我们与代码交互方式的范式转变",
+            "value-1-title": "AI 能力超级增强",
+            "value-1-desc": "让大语言模型突破上下文窗口限制，真正理解整个代码库，从\"代码补全工具\"升级为\"全流程开发伙伴\"。",
+            "value-1-tip": "AI 辅助调试速度提升10倍",
+            "value-2-title": "主动式代码治理",
+            "value-2-desc": "提前预测并预防生产环境问题，通过AI驱动的风险检测和自动修复，将质量管控从\"事后补救\"变为\"事前预防\"。",
+            "value-2-tip": "生产环境BUG减少60%",
+            "value-3-title": "跨语言统一理解",
+            "value-3-desc": "通过通用语义层打破语言孤岛，一套工具支持Go、Java、Rust、Python等主流语言，统一多语言项目的分析标准。",
+            "value-3-tip": "单一工具处理全栈多语言项目",
+            "value-slogan": "从被动调试到主动的代码掌控",
+            // 快速开始
+            "quickstart-tag": "快速开始",
+            "quickstart-title": "3个简单步骤，即刻上手",
+            "quickstart-desc": "通过直观的命令行界面，几分钟内即可开始分析你的代码库",
+            "step-1-title": "安装 CodeSnapAI",
+            "step-1-desc": "要求 Python 3.10+ 版本，Git（用于仓库分析功能）",
+            "step-2-title": "分析你的代码库",
+            "step-2-desc": "分析器自动检测项目语言，并生成完整的语义模型",
+            "step-3-title": "生成快照并调试",
+            "step-3-desc": "获取AI驱动的问题洞察和可直接落地的代码修复方案",
+            "console-title": "可视化 Web 控制台",
+            "console-desc": "启动Web仪表板，可视化分析结果并管理代码治理任务",
+            // 实际效果
+            "effect-tag": "实际落地效果",
+            "effect-title": "经过生产环境验证的核心性能",
+            "effect-desc": "在100+开源和企业项目中测试，带来可量化的效率提升",
+            "effect-1-title": "行业领先压缩比",
+            "effect-1-desc": "代码库语义压缩技术，体积减少95%仍保留核心信息",
+            "effect-2-title": "关键信息保留率",
+            "effect-2-desc": "完整保留调试所需的代码关系、依赖链和错误模式",
+            "effect-3-title": "极速分析速度",
+            "effect-3-desc": "30秒内完成10万行代码项目的全量语义分析",
+            "effect-4-title": "多语言统一支持",
+            "effect-4-desc": "覆盖Go、Java、C/C++、Rust、Python主流开发语言",
+            "testimonial": "CodeSnapAI将我们的调试时间减少了70%，还帮我们发现了12个传统工具遗漏的关键风险点。现在它已经成为我们CI/CD流水线的核心组成部分，是大型项目开发的必备工具。",
+            "testimonial-role": "TechCorp 高级工程负责人",
+            // 长期愿景
+            "vision-tag": "长期发展愿景",
+            "vision-title": "代码智能的未来演进",
+            "vision-desc": "CodeSnapAI 正逐步进化为终极的 AI 原生代码智能平台",
+            "vision-1-title": "自主代码修复",
+            "vision-1-desc": "从问题检测到代码修复、测试、验证的全流程自动化，对常见问题实现零人工干预的端到端解决方案。",
+            "vision-2-title": "全球代码知识图",
+            "vision-2-desc": "构建去中心化的开源代码语义图谱，实现跨仓库的代码理解和依赖风险预测，打造全球开发者的共享知识底座。",
+            "vision-3-title": "代码推理AGI",
+            "vision-3-desc": "打造真正理解代码意图的人工智能，能够重构整个系统架构，并根据业务目标提供最优的技术实现方案。",
+            "roadmap-title": "思路发展路线图",
+            "roadmap-2025-title": "第一阶段：能力增强",
+            "roadmap-2025-1": "完善TypeScript/JavaScript全量支持",
+            "roadmap-2025-2": "推出VS Code/IntelliJ IDE原生插件",
+            "roadmap-2025-3": "新增企业级安全合规检测功能",
+            "roadmap-2026-title": "第二阶段：生态扩展",
+            "roadmap-2026-1": "构建跨仓库代码语义图谱",
+            "roadmap-2026-2": "AI驱动的架构优化建议功能",
+            "roadmap-2026-3": "自动化代码重构工作流",
+            "roadmap-2027-title": "第三阶段：范式变革",
+            "roadmap-2027-1": "全自动化代码修复系统",
+            "roadmap-2027-2": "代码推理AGI能力集成",
+            "roadmap-2027-3": "去中心化代码知识网络",
+            // CTA
+            "cta-title": "准备好变革你的代码开发工作流了吗？",
+            "cta-desc": "加入数千名开发者的行列，使用CodeSnapAI写出更优质的代码，提升开发效率。",
+            "cta-btn-1": "免费开始使用",
+            "cta-btn-2": "在GitHub上思路",
+            // 页脚
+            "footer-desc": "AI驱动的语义代码分析与智能治理平台，让代码开发更高效、更安全。",
+            "footer-links-1": "思路",
+            "footer-link-1-1": "核心功能",
+            "footer-link-1-2": "快速开始",
+            "footer-link-1-3": "落地效果",
+            "footer-link-1-4": "发展路线",
+            "footer-links-2": "资源",
+            "footer-link-2-1": "文档中心",
+            "footer-link-2-2": "API参考",
+            "footer-link-2-3": "教程指南",
+            "footer-link-2-4": "技术支持",
+            "footer-links-3": "关于我们",
+            "footer-link-3-1": "团队介绍",
+            "footer-link-3-2": "招贤纳士",
+            "footer-link-3-3": "联系我们",
+            "footer-link-3-4": "隐私政策",
+            "footer-copyright": "© 2025 CodeSnapAI 贡献者保留所有权利。基于 Apache 2.0 协议开源。"
+        },
+        en: {
+            // 导航
+            "nav-problem": "Core Problem",
+            "nav-pain": "Pain Points",
+            "nav-value": "Core Value",
+            "nav-quickstart": "Quick Start",
+            "nav-effect": "Real Results",
+            "nav-vision": "Long-Term Vision",
+            "nav-start": "Get Started",
+            // 英雄区
+            "hero-tag": "AI-Powered Semantic Code Analysis & Governance Platform",
+            "hero-title-1": "Solve the",
+            "hero-title-2": "Context Paradox",
+            "hero-title-3": "in Modern Coding",
+            "hero-desc": "Compress 5MB+ codebases into <200KB semantic snapshots while preserving 95%+ debugging-critical information. Empower AI-assisted development at unprecedented scale.",
+            "btn-start": "Quick Start",
+            "btn-learn": "Learn More",
+            "demo-title": "Core Value Demo",
+            "demo-original": "Original Codebase",
+            "demo-snapshot": "Semantic Snapshot",
+            "demo-retention": "95%+ Debugging Information Preserved",
+            // 核心问题
+            "problem-tag": "Targeted Core Problem",
+            "problem-title": "Core Dilemma of Modern Software Engineering",
+            "problem-desc": "As codebases grow exponentially, we face a paradox that traditional tools cannot solve",
+            "problem-1-title": "Context Explosion",
+            "problem-1-desc": "Modern projects contain millions of lines of code, hundreds of dependencies, and complex call graphs. AI models and developers are overwhelmed by massive information and cannot focus on core logic efficiently.",
+            "problem-2-title": "Information Loss",
+            "problem-2-desc": "Traditional summarization and compression tools lose critical semantic relationships, error patterns, and dependency chains — the core information needed for debugging and governance, rendering analysis results useless.",
+            // 实际痛点
+            "pain-tag": "Real-World Pain Points",
+            "pain-title": "Efficiency Bottlenecks Developers Face Daily",
+            "pain-desc": "Engineers waste an average of 30% of their working hours on avoidable problems, which CodeSnapAI solves at the root",
+            "pain-1-title": "Low Debugging Efficiency",
+            "pain-1-desc": "Spending hours tracing call chains and understanding unfamiliar codebases, with an average of over 2 hours to locate a single bug",
+            "pain-2-title": "Risk Blind Spots",
+            "pain-2-desc": "Missing high-risk code patterns and hidden dependencies in large projects, leading to frequent production failures",
+            "pain-3-title": "Inefficient Analysis Tools",
+            "pain-3-desc": "Slow, resource-intensive static analysis tools that ultimately generate a large number of unimplementable reports",
+            "pain-4-title": "Language Tool Silos",
+            "pain-4-desc": "Using separate analysis tools for each language, resulting in fragmented workflows and high team collaboration costs",
+            "pain-stat-1": "Debugging time wasted on context understanding",
+            "pain-stat-2": "Teams use 3+ different code analysis tools",
+            "pain-stat-3": "Productivity decline due to tool switching",
+            // 核心价值
+            "value-tag": "Transformative Core Value",
+            "value-title": "Unlock Infinite Possibilities in Code Development",
+            "value-desc": "CodeSnapAI is not just a tool, but a paradigm shift in how we interact with code",
+            "value-1-title": "AI Capability Super Enhancement",
+            "value-1-desc": "Enable large language models to break through context window limitations, truly understand entire codebases, and evolve from \"code completion tools\" to \"full-process development partners\".",
+            "value-1-tip": "10x faster AI-assisted debugging",
+            "value-2-title": "Proactive Code Governance",
+            "value-2-desc": "Predict and prevent production issues in advance, transforming quality control from \"post-mortem remediation\" to \"precautionary prevention\" through AI-driven risk detection and automatic repair.",
+            "value-2-tip": "60% reduction in production bugs",
+            "value-3-title": "Cross-Language Unified Understanding",
+            "value-3-desc": "Break language silos through a universal semantic layer, supporting mainstream languages such as Go, Java, Rust, and Python with a single tool, unifying analysis standards for multi-language projects.",
+            "value-3-tip": "Single tool for full-stack multi-language projects",
+            "value-slogan": "From passive debugging to active code control",
+            // 快速开始
+            "quickstart-tag": "Quick Start",
+            "quickstart-title": "Get Started in 3 Simple Steps",
+            "quickstart-desc": "Analyze your codebase in minutes with an intuitive command-line interface",
+            "step-1-title": "Install CodeSnapAI",
+            "step-1-desc": "Requires Python 3.10+, Git (for repository analysis features)",
+            "step-2-title": "Analyze Your Codebase",
+            "step-2-desc": "The analyzer automatically detects project languages and generates a complete semantic model",
+            "step-3-title": "Generate Snapshot & Debug",
+            "step-3-desc": "Get AI-driven problem insights and actionable code repair solutions",
+            "console-title": "Visual Web Console",
+            "console-desc": "Launch the web dashboard to visualize analysis results and manage code governance tasks",
+            // 实际效果
+            "effect-tag": "Real-World Results",
+            "effect-title": "Production-Validated Core Performance",
+            "effect-desc": "Tested on 100+ open-source and enterprise projects, delivering quantifiable efficiency improvements",
+            "effect-1-title": "Industry-Leading Compression Ratio",
+            "effect-1-desc": "Semantic compression technology for codebases, reducing volume by 95% while retaining core information",
+            "effect-2-title": "Critical Information Retention Rate",
+            "effect-2-desc": "Fully preserve code relationships, dependency chains, and error patterns required for debugging",
+            "effect-3-title": "Ultra-Fast Analysis Speed",
+            "effect-3-desc": "Complete full semantic analysis of 100,000 LOC projects in less than 30 seconds",
+            "effect-4-title": "Multi-Language Unified Support",
+            "effect-4-desc": "Covers mainstream development languages: Go, Java, C/C++, Rust, Python",
+            "testimonial": "CodeSnapAI reduced our debugging time by 70% and helped us identify 12 critical risk points missed by traditional tools. It has now become a core component of our CI/CD pipeline and an essential tool for large-scale project development.",
+            "testimonial-role": "Senior Engineering Lead at TechCorp",
+            // 长期愿景
+            "vision-tag": "Long-Term Vision",
+            "vision-title": "Future Evolution of Code Intelligence",
+            "vision-desc": "CodeSnapAI is evolving into the ultimate AI-native code intelligence platform",
+            "vision-1-title": "Autonomous Code Repair",
+            "vision-1-desc": "End-to-end automation from problem detection to code repair, testing, and validation, with zero human intervention for common issues.",
+            "vision-2-title": "Global Code Knowledge Graph",
+            "vision-2-desc": "Build a decentralized open-source code semantic graph to enable cross-repository code understanding and dependency risk prediction, creating a shared knowledge base for global developers.",
+            "vision-3-title": "Code Reasoning AGI",
+            "vision-3-desc": "Create artificial intelligence that truly understands code intent, capable of restructuring entire system architectures and providing optimal technical implementation solutions based on business goals.",
+            "roadmap-title": "Product Roadmap",
+            "roadmap-2025-title": "Phase 1: Capability Enhancement",
+            "roadmap-2025-1": "Complete TypeScript/JavaScript full support",
+            "roadmap-2025-2": "Launch VS Code/IntelliJ IDE native plugins",
+            "roadmap-2025-3": "Add enterprise-level security compliance detection features",
+            "roadmap-2026-title": "Phase 2: Ecosystem Expansion",
+            "roadmap-2026-1": "Build cross-repository code semantic graph",
+            "roadmap-2026-2": "AI-driven architecture optimization recommendation feature",
+            "roadmap-2026-3": "Automated code refactoring workflows",
+            "roadmap-2027-title": "Phase 3: Paradigm Shift",
+            "roadmap-2027-1": "Fully automated code repair system",
+            "roadmap-2027-2": "Code reasoning AGI capability integration",
+            "roadmap-2027-3": "Decentralized code knowledge network",
+            // CTA
+            "cta-title": "Ready to Transform Your Code Development Workflow?",
+            "cta-desc": "Join thousands of developers using CodeSnapAI to write better code and boost development efficiency.",
+            "cta-btn-1": "Get Started for Free",
+            "cta-btn-2": "Star on GitHub",
+            // 页脚
+            "footer-desc": "AI-powered semantic code analysis and governance platform, making code development more efficient and secure.",
+            "footer-links-1": "Product",
+            "footer-link-1-1": "Core Features",
+            "footer-link-1-2": "Quick Start",
+            "footer-link-1-3": "Real Results",
+            "footer-link-1-4": "Roadmap",
+            "footer-links-2": "Resources",
+            "footer-link-2-1": "Documentation",
+            "footer-link-2-2": "API Reference",
+            "footer-link-2-3": "Tutorials",
+            "footer-link-2-4": "Technical Support",
+            "footer-links-3": "About Us",
+            "footer-link-3-1": "Team Introduction",
+            "footer-link-3-2": "Careers",
+            "footer-link-3-3": "Contact Us",
+            "footer-link-3-4": "Privacy Policy",
+            "footer-copyright": "© 2025 CodeSnapAI Contributors. All rights reserved. Open source under the Apache 2.0 License."
+        }
+    };
+
+    // 2. 全局变量与核心功能
+    let currentLang = 'zh'; // 默认中文
+    let problemChart, effectChart; // 图表实例
+
+    // 语言切换核心函数
+    function switchLang(lang) {
+        if (lang === currentLang) return;
+        currentLang = lang;
+
+        // 更新语言按钮样式
+        document.getElementById('lang-zh').className = lang === 'zh'
+            ? 'px-3 py-1 rounded bg-primary text-white text-sm font-medium'
+            : 'px-3 py-1 rounded text-gray-300 text-sm font-medium';
+        document.getElementById('lang-en').className = lang === 'en'
+            ? 'px-3 py-1 rounded bg-primary text-white text-sm font-medium'
+            : 'px-3 py-1 rounded text-gray-300 text-sm font-medium';
+
+        // 批量更新所有带data-lang的文本元素
+        document.querySelectorAll('[data-lang]').forEach(el => {
+            const key = el.getAttribute('data-lang');
+            if (langPackage[lang][key]) {
+                el.textContent = langPackage[lang][key];
+            }
+        });
+
+        // 重新渲染图表（适配语言）
+        renderCharts();
+    }
+
+    // 粒子背景初始化（科技感动态背景）
+    function initParticles() {
+        if (typeof particlesJS === 'undefined') return;
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: ['#6366f1', '#10b981', '#f97316'] }, // 主色匹配
+                shape: { type: 'circle' },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: {
+                    enable: true,
+                    distance: 150,
+                    color: '#6366f1',
+                    opacity: 0.2,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 1,
+                    direction: 'none',
+                    random: true,
+                    straight: false,
+                    out_mode: 'out',
+                    bounce: false
+                }
+            },
+            interactivity: {
+                detect_on: 'canvas',
+                events: {
+                    onhover: { enable: true, mode: 'grab' }, // 鼠标悬浮吸附
+                    onclick: { enable: true, mode: 'push' }, // 点击生成粒子
+                    resize: true
+                },
+                modes: {
+                    grab: { distance: 140, line_linked: { opacity: 0.5 } },
+                    push: { particles_nb: 4 }
+                }
+            },
+            retina_detect: true // 视网膜屏适配
+        });
+    }
+
+    // 图表渲染函数（数据可视化，适配双语）
+    function renderCharts() {
+        // 销毁旧图表避免重复渲染
+        if (problemChart) problemChart.destroy();
+        if (effectChart) effectChart.destroy();
+
+        // 1. 核心问题图表：代码库规模与信息损耗关系
+        const problemCtx = document.getElementById('problemChart').getContext('2d');
+        problemChart = new Chart(problemCtx, {
+            type: 'line',
+            data: {
+                labels: ['10K LOC', '50K LOC', '100K LOC', '500K LOC', '1M LOC'],
+                datasets: [
+                    {
+                        label: currentLang === 'zh' ? '上下文复杂度' : 'Context Complexity',
+                        data: [20, 50, 80, 150, 300],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: currentLang === 'zh' ? '信息保留率' : 'Information Retention',
+                        data: [98, 85, 70, 40, 20],
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    title: {
+                        display: true,
+                        text: currentLang === 'zh' ? '代码库规模与信息损耗关系' : 'Codebase Size vs Information Loss'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: currentLang === 'zh' ? '数值/百分比' : 'Value / Percentage' }
+                    }
+                }
+            }
+        });
+
+        // 2. 实际效果图表：效率提升对比
+        const effectCtx = document.getElementById('effectChart').getContext('2d');
+        effectChart = new Chart(effectCtx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    currentLang === 'zh' ? '调试效率' : 'Debugging Efficiency',
+                    currentLang === 'zh' ? '分析速度' : 'Analysis Speed',
+                    currentLang === 'zh' ? '风险检测' : 'Risk Detection',
+                    currentLang === 'zh' ? '跨语言支持' : 'Cross-Language Support'
+                ],
+                datasets: [
+                    {
+                        label: currentLang === 'zh' ? '传统工具' : 'Traditional Tools',
+                        data: [30, 20, 40, 15],
+                        backgroundColor: 'rgba(249, 115, 22, 0.5)'
+                    },
+                    {
+                        label: currentLang === 'zh' ? 'CodeSnapAI' : 'CodeSnapAI',
+                        data: [95, 90, 85, 98],
+                        backgroundColor: 'rgba(99, 102, 241, 0.5)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    title: {
+                        display: true,
+                        text: currentLang === 'zh' ? 'CodeSnapAI 效率提升对比' : 'CodeSnapAI Efficiency Improvement Comparison'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: currentLang === 'zh' ? '效率评分 (100分制)' : 'Efficiency Score (100-point scale)' }
+                    }
+                }
+            }
+        });
+    }
+
+    // 剪贴板功能初始化（代码块一键复制）
+    function initClipboard() {
+        if (typeof ClipboardJS === 'undefined') return;
+        const clipboard = new ClipboardJS('.clipboard-btn');
+        clipboard.on('success', function(e) {
+            // 显示复制成功提示
+            const toast = e.trigger.nextElementSibling;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+            e.clearSelection();
+        });
+    }
+
+    // 页面加载完成后初始化所有功能
+    document.addEventListener('DOMContentLoaded', function() {
+        // 绑定语言切换事件
+        document.getElementById('lang-zh').addEventListener('click', () => switchLang('zh'));
+        document.getElementById('lang-en').addEventListener('click', () => switchLang('en'));
+
+        // 初始化粒子背景
+        initParticles();
+
+        // 初始化图表
+        renderCharts();
+
+        // 初始化剪贴板
+        initClipboard();
+
+        // 移动端菜单简易交互（可扩展）
+        document.querySelector('.md\\:hidden').addEventListener('click', function() {
+            alert(currentLang === 'zh' ? '移动端菜单将在后续版本中完善' : 'Mobile menu will be improved in future versions');
+        });
+    });
+</script>
+</body>
+</html>
