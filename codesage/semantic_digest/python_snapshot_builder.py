@@ -76,6 +76,7 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
 
         functions = self.parser.extract_functions()
         classes = self.parser.extract_classes()
+        variables = self.parser.extract_variables()
 
         complexity_results = analyze_file_complexity(source_code, self.risk_config.threshold_complexity_high)
 
@@ -112,6 +113,7 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
         symbols = {
             "classes": [c.model_dump() for c in classes],
             "functions": [f.model_dump() for f in functions],
+            "variables": [v.model_dump() for v in variables],
             "functions_detail": [f.model_dump() for f in functions], # For richer rule context
         }
 
