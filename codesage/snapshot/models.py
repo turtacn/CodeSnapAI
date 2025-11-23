@@ -101,6 +101,7 @@ class FileSnapshot(BaseModel):
     symbols: Optional[Dict[str, Any]] = Field(default_factory=dict, description="A dictionary of symbols defined in the file.")
     risk: Optional[FileRisk] = Field(None, description="Risk assessment for the file.")
     issues: List[Issue] = Field(default_factory=list, description="A list of issues identified in the file.")
+    compression_level: Literal["full", "skeleton", "signature"] = Field("full", description="The compression level applied to the file.")
 
     # Old fields for compatibility
     hash: Optional[str] = Field(None, description="The SHA256 hash of the file content.")
