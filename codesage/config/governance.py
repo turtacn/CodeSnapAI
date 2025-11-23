@@ -21,6 +21,8 @@ class ValidationConfig(BaseModel):
         },
         description="Commands to run tests for different languages."
     )
+    execution_timeout: int = Field(30, description="Timeout in seconds for sandbox execution.")
+    max_retries: int = Field(3, description="Maximum number of retries for failed validation.")
 
 
 class GovernanceConfig(BaseModel):
