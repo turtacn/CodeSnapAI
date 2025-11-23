@@ -12,13 +12,29 @@ from codesage.snapshot.models import (
     SnapshotMetadata,
     DependencyGraph,
 )
+from codesage.analyzers.shell_parser import ShellParser
 
 class ShellSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
     def build(self) -> ProjectSnapshot:
         files = self._collect_files()
         file_snapshots: List[FileSnapshot] = [self._build_file_snapshot(path) for path in files]
 
-        dep_graph = DependencyGraph()  # Simplified for now
+        dep_graph = DependencyGraph()
+
+        for fs in file_snapshots:
+            if fs.symbols and "imports" in fs.symbols:
+                for imp in fs.symbols["imports"]:
+                    # In shell, imports are sourced files.
+                    # If they are relative, they might be internal.
+                    if imp.startswith("/") or imp.startswith("http"):
+                        dep_graph.external.append(imp)
+                    else:
+                        # Attempt to resolve? For now just list as internal edge if we can match it?
+                        # Or just add to edges?
+                        # dep_graph.internal.append({"source": fs.path, "target": imp})
+                        pass
+
+        dep_graph.external = sorted(list(set(dep_graph.external)))
 
         metadata = SnapshotMetadata(
             version="1.1",
@@ -45,7 +61,7 @@ class ShellSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
                 try:
                     with open(p, "r") as f:
                         first_line = f.readline()
-                        if first_line.startswith("#!/bin/bash") or first_line.startswith("#!/usr/bin/env bash"):
+                        if first_line.startswith("#!/bin/bash") or first_line.startswith("#!/usr/bin/env bash") or first_line.startswith("#!/bin/sh"):
                             files.append(p)
                 except Exception:
                     pass
@@ -53,26 +69,44 @@ class ShellSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
 
     def _build_file_snapshot(self, file_path: Path) -> FileSnapshot:
         source_code = file_path.read_text()
-        lines = source_code.splitlines()
 
-        loc = len([line for line in lines if line.strip() and not line.strip().startswith("#")])
-        num_functions = len(re.findall(r"^\s*(?:function\s+)?\w+\s*\(\s*\)\s*\{", source_code, re.MULTILINE))
+        parser = ShellParser()
+        parser.parse(source_code)
 
-        external_commands = set()
-        for line in lines:
-            if line.strip() and not line.strip().startswith("#"):
-                match = re.match(r"^\s*(\w+)", line)
-                if match:
-                    # A simple heuristic to avoid shell keywords
-                    if match.group(1) not in ["if", "then", "else", "fi", "for", "do", "done", "while", "until", "case", "esac", "function"]:
-                        external_commands.add(match.group(1))
+        functions = parser.extract_functions()
+        variables = parser.extract_variables()
+        external_commands = parser.extract_external_commands()
+        imports = parser.extract_imports()
+
+        funcs_data = [{
+            "name": f.name,
+            "start_line": f.start_line,
+            "end_line": f.end_line
+        } for f in functions]
+
+        vars_data = [{
+            "name": v.name,
+            "value": v.value,
+            "kind": v.kind
+        } for v in variables]
 
         metrics = FileMetrics(
-            lines_of_code=loc,
-            num_functions=num_functions,
-            language_specific={"shell": {"external_commands_count": len(external_commands)}},
+            lines_of_code=len(source_code.splitlines()),
+            num_functions=len(functions),
+            language_specific={
+                "shell": {
+                    "external_commands_count": len(external_commands),
+                    "global_vars": len([v for v in variables if v.kind == "global"]),
+                    "local_vars": len([v for v in variables if v.kind == "local"])
+                }
+            }
         )
-        symbols = {"external_commands": list(external_commands)}
+        symbols = {
+            "functions": funcs_data,
+            "variables": vars_data,
+            "external_commands": external_commands,
+            "imports": [i.path for i in imports]
+        }
         return FileSnapshot(
             path=str(file_path.relative_to(self.root_path)),
             language="shell",
