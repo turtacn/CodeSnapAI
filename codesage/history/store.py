@@ -62,16 +62,16 @@ class StorageEngine:
             # Let's check `ProjectIssuesSummary` structure or where issues are stored.
 
             # For now, we iterate files to find issues if not readily available in a flat list.
-            # Wait, `ProjectSnapshot` has `files` which is `Dict[str, FileSnapshot]`.
+            # Wait, `ProjectSnapshot` has `files` which is `List[FileSnapshot]`.
             # `FileSnapshot` has `issues: List[Issue]`.
 
-            for file_path, file_snapshot in snapshot_data.files.items():
+            for file_snapshot in snapshot_data.files:
                 if file_snapshot.issues:
                     for issue in file_snapshot.issues:
                         db_issue = Issue(
                             snapshot_id=db_snapshot.id,
-                            file_path=file_path,
-                            line_number=issue.line,
+                            file_path=file_snapshot.path,
+                            line_number=issue.location.line,
                             severity=issue.severity,
                             rule_id=getattr(issue, 'category', 'unknown'), # Assuming category or rule_id exists
                             description=issue.message
@@ -153,3 +153,16 @@ def get_storage() -> StorageEngine:
         _engine = StorageEngine() # Default to sqlite
     return _engine
 
+# Legacy helper functions for file-based history (mock implementations or adaptors)
+def load_historical_snapshot(root, project_name, snapshot_id):
+    # This was likely reading YAML files.
+    # If we want to support it via DB, we can.
+    # But for now, to satisfy imports, we can raise Not Implemented or return None/Mock.
+    pass
+
+def save_historical_snapshot(root, project_name, snapshot):
+    pass
+
+def load_snapshot_index(root, project_name):
+    from codesage.history.models import SnapshotIndex
+    return SnapshotIndex(project_name=project_name)

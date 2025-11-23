@@ -51,7 +51,7 @@ Modern software development faces **three critical bottlenecks**:
 ## ✨ Key Features
 
 ### 1. **Multi-Language Semantic Analyzer**
-- **Unified AST Parsing**: Leverages tree-sitter for Go, Java, C/C++, Rust, Python
+- **Unified AST Parsing**: Leverages tree-sitter for Go, Java, C/C++, Rust, Python, Shell
 - **Deep Semantic Extraction**:
   - Function signatures, call graphs, dependency trees
   - Complexity metrics (cyclomatic, cognitive, nesting depth)
@@ -136,12 +136,25 @@ poetry install
     ```
 2.  **Analyze Your Code**:
     ```bash
-    poetry run codesage analyze ./your-project
+    # Auto-detect languages (Python, Go, Java, Shell)
+    poetry run codesage scan ./your-project --language auto
     ```
 3.  **Create a Snapshot**:
     ```bash
-    poetry run codesage snapshot create
+    poetry run codesage snapshot create ./your-project
     ```
+
+### Docker Usage
+
+You can run CodeSnapAI using Docker without installing dependencies locally.
+
+```bash
+# Build the image
+docker build -t codesage .
+
+# Run a scan
+docker run -v $(pwd):/workspace codesage scan .
+```
 
 ### Quick Start
 

@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  codesage:
+    build: .
+    volumes:
+      - ./:/workspace
+    environment:
+      - PYTHONPATH=/app
+    command: scan .

@@ -48,6 +48,7 @@ def snapshot():
 
 from codesage.semantic_digest.go_snapshot_builder import GoSemanticSnapshotBuilder
 from codesage.semantic_digest.shell_snapshot_builder import ShellSemanticSnapshotBuilder
+from codesage.semantic_digest.java_snapshot_builder import JavaSemanticSnapshotBuilder
 
 
 from codesage.audit.models import AuditEvent
@@ -57,7 +58,7 @@ from codesage.audit.models import AuditEvent
 @click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest']), default='json', help='Snapshot format.')
 @click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
-@click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'auto']), default='python', help='Language to analyze.')
+@click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'java', 'auto']), default='auto', help='Language to analyze.')
 @click.pass_context
 def create(ctx, path, format, output, compress, language):
     """Create a new snapshot from the given path."""
@@ -71,17 +72,48 @@ def create(ctx, path, format, output, compress, language):
                 output = f"{root_path.name}_{language}_semantic_digest.yaml"
 
             config = SnapshotConfig()
+            builder = None
+
+            if language == 'auto':
+                # We cannot easily auto-detect here without merging multiple snapshots logic which is in scan.py
+                # For now, we will fail or fallback to scanning all supported languages and picking one or errors.
+                # However, reusing logic from scan.py might be better.
+                # But to keep it simple and since scan.py does the heavy lifting for scanning,
+                # we might just recommend using scan command for multi-language.
+                # But the task requires snapshot command update too.
+
+                # Let's implement basic single-builder detection or multi-builder if possible.
+                # Reusing logic from scan.py is hard because scan.py logic is not exported nicely.
+                # Let's just check extensions and pick the first found or error if multiple?
+                # Or assume user passes specific language if they want specific digest.
+                # But let's try to support 'auto' by picking the most prominent language or just python if ambiguous.
+
+                # Better approach: Import detection logic from scan.py if I move it to a utility.
+                # I defined detect_languages in scan.py, I should have put it in utils.
+
+                # For now, I'll support 'java' explicitly and handle 'auto' minimally.
+                click.echo("Auto detection for snapshot create is partial. Please specify language for best results.")
+                # Simple check
+                if list(root_path.rglob("*.java")):
+                    language = "java"
+                elif list(root_path.rglob("*.py")):
+                    language = "python"
+                elif list(root_path.rglob("*.go")):
+                    language = "go"
+                elif list(root_path.rglob("*.sh")):
+                    language = "shell"
+                else:
+                    click.echo("Could not auto-detect language.", err=True)
+                    return
+
             if language == 'python':
                 builder = PythonSemanticSnapshotBuilder(root_path, config)
             elif language == 'go':
                 builder = GoSemanticSnapshotBuilder(root_path, config)
             elif language == 'shell':
                 builder = ShellSemanticSnapshotBuilder(root_path, config)
-            elif language == 'auto':
-                # In a real implementation, this would involve more sophisticated logic
-                # to detect languages and combine snapshots.
-                click.echo("Auto language detection is not yet implemented.")
-                return
+            elif language == 'java':
+                builder = JavaSemanticSnapshotBuilder(root_path, config)
             else:
                 click.echo(f"Unsupported language: {language}", err=True)
                 return

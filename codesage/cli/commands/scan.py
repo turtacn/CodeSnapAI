@@ -2,16 +2,18 @@ import click
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 from codesage.semantic_digest.python_snapshot_builder import PythonSemanticSnapshotBuilder, SnapshotConfig
 from codesage.semantic_digest.go_snapshot_builder import GoSemanticSnapshotBuilder
 from codesage.semantic_digest.shell_snapshot_builder import ShellSemanticSnapshotBuilder
-from codesage.snapshot.models import ProjectSnapshot, Issue, IssueLocation
+from codesage.semantic_digest.java_snapshot_builder import JavaSemanticSnapshotBuilder
+from codesage.snapshot.models import ProjectSnapshot, Issue, IssueLocation, FileSnapshot, ProjectRiskSummary, ProjectIssuesSummary, SnapshotMetadata, DependencyGraph
 from codesage.reporters import ConsoleReporter, JsonReporter, GitHubPRReporter
 from codesage.cli.plugin_loader import PluginManager
 from codesage.history.store import StorageEngine
 from codesage.core.interfaces import CodeIssue
+from datetime import datetime, timezone
 
 def get_builder(language: str, path: Path):
     config = SnapshotConfig()
@@ -21,12 +23,121 @@ def get_builder(language: str, path: Path):
         return GoSemanticSnapshotBuilder(path, config)
     elif language == 'shell':
         return ShellSemanticSnapshotBuilder(path, config)
+    elif language == 'java':
+        return JavaSemanticSnapshotBuilder(path, config)
     else:
         return None
 
+def detect_languages(path: Path) -> List[str]:
+    languages = set()
+    for root, _, files in os.walk(path):
+        for file in files:
+            if file.endswith(".py"):
+                languages.add("python")
+            elif file.endswith(".go"):
+                languages.add("go")
+            elif file.endswith(".java"):
+                languages.add("java")
+            elif file.endswith(".sh"):
+                languages.add("shell")
+    return list(languages)
+
+def merge_snapshots(snapshots: List[ProjectSnapshot], project_name: str) -> ProjectSnapshot:
+    if not snapshots:
+        raise ValueError("No snapshots to merge")
+
+    if len(snapshots) == 1:
+        return snapshots[0]
+
+    files: List[FileSnapshot] = []
+    languages: List[str] = []
+    file_count = 0
+    total_size = 0
+
+    # Collect files and calculate basic metadata
+    for s in snapshots:
+        files.extend(s.files)
+        languages.extend(s.languages if s.languages else [])
+        file_count += s.metadata.file_count
+        total_size += s.metadata.total_size
+
+    # Deduplicate languages
+    languages = list(set(languages))
+
+    # Merge Risk Summary
+    # This is a simplified merge. Ideally, we should recalculate.
+    # But summarize_project_risk takes file_risks map. We can do that.
+    # Re-import summarize logic if needed, or just aggregate counts.
+    high_risk = sum(s.risk_summary.high_risk_files for s in snapshots if s.risk_summary)
+    medium_risk = sum(s.risk_summary.medium_risk_files for s in snapshots if s.risk_summary)
+    low_risk = sum(s.risk_summary.low_risk_files for s in snapshots if s.risk_summary)
+
+    # Average risk is weighted by file count
+    total_risk_score = sum(s.risk_summary.avg_risk * s.metadata.file_count for s in snapshots if s.risk_summary)
+    avg_risk = total_risk_score / file_count if file_count > 0 else 0.0
+
+    risk_summary = ProjectRiskSummary(
+        avg_risk=avg_risk,
+        high_risk_files=high_risk,
+        medium_risk_files=medium_risk,
+        low_risk_files=low_risk
+    )
+
+    # Merge Issues Summary
+    total_issues = 0
+    by_severity = {}
+    by_rule = {}
+
+    for s in snapshots:
+        if s.issues_summary:
+            total_issues += s.issues_summary.total_issues
+            for sev, count in s.issues_summary.by_severity.items():
+                by_severity[sev] = by_severity.get(sev, 0) + count
+            for rule, count in s.issues_summary.by_rule.items():
+                by_rule[rule] = by_rule.get(rule, 0) + count
+
+    issues_summary = ProjectIssuesSummary(
+        total_issues=total_issues,
+        by_severity=by_severity,
+        by_rule=by_rule
+    )
+
+    # Merge Dependencies (Simple concatenation)
+    internal_deps = []
+    external_deps = []
+    for s in snapshots:
+        if s.dependencies:
+            internal_deps.extend(s.dependencies.internal)
+            external_deps.extend(s.dependencies.external)
+
+    dependency_graph = DependencyGraph(
+        internal=internal_deps,
+        external=list(set(external_deps)),
+        edges=[]
+    )
+
+    metadata = SnapshotMetadata(
+        version=snapshots[0].metadata.version,
+        timestamp=datetime.now(timezone.utc),
+        project_name=project_name,
+        file_count=file_count,
+        total_size=total_size,
+        tool_version=snapshots[0].metadata.tool_version,
+        config_hash=snapshots[0].metadata.config_hash # Assuming same config for all
+    )
+
+    return ProjectSnapshot(
+        metadata=metadata,
+        files=files,
+        dependencies=dependency_graph,
+        risk_summary=risk_summary,
+        issues_summary=issues_summary,
+        languages=languages
+    )
+
 @click.command('scan')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
-@click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell']), default='python', help='Language to analyze.')
+@click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'java', 'auto']), default='auto', help='Language to analyze.')
 @click.option('--reporter', '-r', type=click.Choice(['console', 'json', 'github']), default='console', help='Reporter to use.')
 @click.option('--output', '-o', help='Output path for JSON reporter.')
 @click.option('--fail-on-high', is_flag=True, help='Exit with non-zero code if high severity issues are found.')
@@ -50,71 +161,123 @@ def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_d
     plugin_manager = PluginManager(plugins_dir)
     plugin_manager.load_plugins()
 
-    click.echo(f"Scanning {path} for {language}...")
-
     root_path = Path(path)
-    builder = get_builder(language, root_path)
+    target_languages = []
 
-    if not builder:
-        click.echo(f"Unsupported language: {language}", err=True)
+    if language == 'auto':
+        click.echo(f"Auto-detecting languages in {path}...")
+        target_languages = detect_languages(root_path)
+        if not target_languages:
+            click.echo("No supported languages found.", err=True)
+            ctx.exit(1)
+        click.echo(f"Detected languages: {', '.join(target_languages)}")
+    else:
+        target_languages = [language]
+
+    snapshots = []
+
+    for lang in target_languages:
+        click.echo(f"Scanning {path} for {lang}...")
+        builder = get_builder(lang, root_path)
+
+        if not builder:
+            click.echo(f"Unsupported language: {lang}", err=True)
+            continue
+
+        try:
+            s = builder.build()
+            # Manually ensure language list is populated if builder didn't
+            if not s.languages:
+                s.languages = [lang]
+            snapshots.append(s)
+        except Exception as e:
+            click.echo(f"Scan failed for {lang}: {e}", err=True)
+            # We continue to try other languages
+
+    if not snapshots:
+        click.echo("No snapshots generated.", err=True)
         ctx.exit(1)
 
+    # Merge snapshots
     try:
-        snapshot: ProjectSnapshot = builder.build()
-
-        # 3. Apply Custom Rules (Plugins)
-        for rule in plugin_manager.rules:
-            for file_path, file_snapshot in snapshot.files.items():
-                try:
-                    content = ""
-                    full_path = root_path / file_path
-                    if full_path.exists():
-                        content = full_path.read_text(errors='ignore')
-
-                    issues = rule.check(str(file_path), content, {})
-                    if issues:
-                        for i in issues:
-                            # Convert plugin CodeIssue to standard Issue model
-
-                            # Map severity to Issue severity Literal
-                            severity = "warning"
-                            if i.severity.lower() in ["info", "warning", "error"]:
-                                severity = i.severity.lower()
-                            elif i.severity.lower() == "high":
-                                severity = "error"
-                            elif i.severity.lower() == "low":
-                                severity = "info"
-
-                            new_issue = Issue(
-                                rule_id=rule.id,
-                                severity=severity,
-                                message=i.description,
-                                location=IssueLocation(
-                                    file_path=str(file_path),
-                                    line=i.line_number
-                                ),
-                                symbol=None,
-                                tags=["custom-rule"]
-                            )
-
-                            if file_snapshot.issues is None:
-                                file_snapshot.issues = []
-                            file_snapshot.issues.append(new_issue)
-
-                except Exception as e:
-                     click.echo(f"Error running rule {rule.id} on {file_path}: {e}", err=True)
-
-        # 4. Save to Storage
-        if storage:
-            try:
-                storage.save_snapshot(snapshot.metadata.project_name, snapshot)
-                click.echo("Snapshot saved to database.")
-            except Exception as e:
-                 click.echo(f"Failed to save snapshot: {e}", err=True)
-
+        snapshot = merge_snapshots(snapshots, root_path.name)
     except Exception as e:
-        click.echo(f"Scan failed: {e}", err=True)
+        click.echo(f"Failed to merge snapshots: {e}", err=True)
         ctx.exit(1)
+
+    # 3. Apply Custom Rules (Plugins)
+    for rule in plugin_manager.rules:
+        # Ensure we iterate over the list of files
+        for file_snapshot in snapshot.files:
+            file_path = Path(file_snapshot.path)
+            try:
+                content = ""
+                full_path = root_path / file_path
+                if full_path.exists():
+                    content = full_path.read_text(errors='ignore')
+
+                issues = rule.check(str(file_path), content, {})
+                if issues:
+                    for i in issues:
+                        # Convert plugin CodeIssue to standard Issue model
+
+                        # Map severity to Issue severity Literal
+                        severity = "warning"
+                        if i.severity.lower() in ["info", "warning", "error"]:
+                            severity = i.severity.lower()
+                        elif i.severity.lower() == "high":
+                            severity = "error"
+                        elif i.severity.lower() == "low":
+                            severity = "info"
+
+                        new_issue = Issue(
+                            rule_id=rule.id,
+                            severity=severity,
+                            message=i.description,
+                            location=IssueLocation(
+                                file_path=str(file_path),
+                                line=i.line_number
+                            ),
+                            symbol=None,
+                            tags=["custom-rule"]
+                        )
+
+                        if file_snapshot.issues is None:
+                            file_snapshot.issues = []
+                        file_snapshot.issues.append(new_issue)
+
+            except Exception as e:
+                 click.echo(f"Error running rule {rule.id} on {file_path}: {e}", err=True)
+
+    # Recalculate Issues Summary after Plugins
+    # Simplified recalculation
+    total_issues = 0
+    by_severity = {}
+
+    for f in snapshot.files:
+        if f.issues:
+            total_issues += len(f.issues)
+            for issue in f.issues:
+                by_severity[issue.severity] = by_severity.get(issue.severity, 0) + 1
+
+    # Update snapshot summary if issues changed
+    if snapshot.issues_summary:
+         snapshot.issues_summary.total_issues = total_issues
+         snapshot.issues_summary.by_severity = by_severity
+    else:
+         snapshot.issues_summary = ProjectIssuesSummary(
+             total_issues=total_issues,
+             by_severity=by_severity
+         )
+
+
+    # 4. Save to Storage
+    if storage:
+        try:
+            storage.save_snapshot(snapshot.metadata.project_name, snapshot)
+            click.echo("Snapshot saved to database.")
+        except Exception as e:
+             click.echo(f"Failed to save snapshot: {e}", err=True)
 
     # Select Reporter
     reporters = []
@@ -124,7 +287,12 @@ def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_d
     if reporter == 'console':
         reporters.append(ConsoleReporter())
     elif reporter == 'json':
+        # Ensure absolute path if output is specified, to avoid CWD issues in tests or complex environments
         out_path = output or "codesage_report.json"
+        if not os.path.isabs(out_path) and output:
+            # If user provided relative path, it's relative to CWD.
+            # JsonReporter handles path, but let's be explicit if needed.
+            pass
         reporters.append(JsonReporter(output_path=out_path))
     elif reporter == 'github':
         reporters.append(ConsoleReporter()) # Still print to console

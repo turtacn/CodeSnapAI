@@ -56,3 +56,25 @@ class Dependency(Base):
     type = Column(String(50)) # import, call, inheritance
 
     snapshot = relationship("Snapshot", back_populates="dependencies")
+
+
+from pydantic import BaseModel
+from typing import List
+from codesage.snapshot.models import SnapshotMetadata, ProjectSnapshot
+
+class SnapshotIndex(BaseModel):
+    """
+    Deprecated: Using SQLAlchemy Snapshot model instead.
+    Kept for backward compatibility if any legacy file-based history code exists.
+    """
+    version: str = "1.0"
+    project_name: str
+    items: List[SnapshotMetadata] = []
+
+class SnapshotMeta(BaseModel):
+    snapshot_id: str
+    created_at: str
+
+class HistoricalSnapshot(BaseModel):
+    metadata: SnapshotMetadata
+    snapshot: ProjectSnapshot

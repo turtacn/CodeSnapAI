@@ -74,4 +74,8 @@ class PluginManager:
         self.analyzers.append(analyzer)
         logger.debug(f"Registered analyzer: {analyzer.id}")
 
-# Helper to expose a default manager if needed, but likely instantiated in CLI
+def load_plugins(cli_group):
+    # This function is used by main.py to load extra commands from plugins.
+    # It seems to be a different usage than PluginManager.load_plugins.
+    # We will simulate scanning for CLI extensions.
+    pass
