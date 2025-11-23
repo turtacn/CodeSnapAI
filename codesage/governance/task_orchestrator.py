@@ -6,17 +6,26 @@ import structlog
 from codesage.governance.task_models import GovernancePlan, GovernanceTask
 from codesage.llm.client import BaseLLMClient, LLMRequest
 from codesage.governance.patch_manager import PatchManager
+from codesage.governance.validator import CodeValidator
+from codesage.config.governance import GovernanceConfig
 
 logger = structlog.get_logger()
 
 RISK_LEVEL_MAP = {"low": 1, "medium": 2, "high": 3, "unknown": 0}
 
 class TaskOrchestrator:
-    def __init__(self, plan: GovernancePlan, llm_client: Optional[BaseLLMClient] = None) -> None:
+    def __init__(
+        self,
+        plan: GovernancePlan,
+        llm_client: Optional[BaseLLMClient] = None,
+        config: Optional[GovernanceConfig] = None
+    ) -> None:
         self._plan = plan
         self._all_tasks: List[GovernanceTask] = self._flatten_tasks()
         self.llm_client = llm_client
         self.patch_manager = PatchManager()
+        self.config = config or GovernanceConfig.default()
+        self.validator = CodeValidator(self.config)
 
     def _flatten_tasks(self) -> List[GovernanceTask]:
         """Extracts and flattens all tasks from the plan's groups."""
@@ -63,9 +72,10 @@ class TaskOrchestrator:
 
         return filtered_tasks
 
-    def execute_task(self, task: GovernanceTask, apply_fix: bool = False) -> bool:
+    def execute_task(self, task: GovernanceTask, apply_fix: bool = False, max_retries: int = 3) -> bool:
         """
         Executes a governance task using the LLM client and optionally applies the fix.
+        Includes a validation loop with rollback and retry.
         """
         if not self.llm_client:
             logger.warning("LLM client not configured, skipping execution", task_id=task.id)
@@ -73,56 +83,83 @@ class TaskOrchestrator:
 
         logger.info("Executing task", task_id=task.id, file=task.file_path)
 
-        # 1. Prepare context and prompt
-        # Assuming task.context contains necessary info or we read file
         file_path = Path(task.file_path)
         if not file_path.exists():
             logger.error("File not found", file_path=str(file_path))
             return False
 
-        file_content = file_path.read_text(encoding="utf-8")
+        original_content = file_path.read_text(encoding="utf-8")
 
-        # Construct a prompt (This logic might be moved to a PromptBuilder later)
-        prompt = (
+        # Initial Prompt
+        base_prompt = (
             f"Fix the following issue in {task.file_path}:\n"
-            f"Issue: {task.issue_type} - {task.message}\n"
-            f"Severity: {task.severity}\n\n"
+            f"Issue: {task.rule_id} - {task.description}\n"
+            f"Severity: {task.risk_level}\n\n"
             f"Here is the file content:\n"
-            f"```\n{file_content}\n```\n\n"
+            f"```\n{original_content}\n```\n\n"
             f"Please provide the FULL corrected file content in a markdown code block."
         )
 
-        # 2. Call LLM
-        request = LLMRequest(
-            prompt=prompt,
-            metadata={"task_id": task.id, "file_path": task.file_path}
-        )
+        current_prompt = base_prompt
+        attempts = 0
 
-        try:
-            response = self.llm_client.generate(request)
-        except Exception as e:
-            logger.error("LLM generation failed", error=str(e))
-            return False
+        while attempts <= max_retries:
+            # 1. Call LLM
+            request = LLMRequest(
+                prompt=current_prompt,
+                metadata={"task_id": task.id, "file_path": task.file_path, "attempt": attempts}
+            )
 
-        # 3. Extract Code
-        new_content = self.patch_manager.extract_code_block(response.content)
-        if not new_content:
-            logger.error("Failed to extract code from LLM response")
-            return False
-
-        # 4. Apply Fix if requested
-        if apply_fix:
-            success = self.patch_manager.apply_patch(file_path, new_content)
-            if success:
-                task.status = "done"
-                logger.info("Task completed and patch applied", task_id=task.id)
-                return True
-            else:
-                logger.error("Failed to apply patch", task_id=task.id)
+            try:
+                response = self.llm_client.generate(request)
+            except Exception as e:
+                logger.error("LLM generation failed", error=str(e))
                 return False
-        else:
-            # Just generate diff for dry-run
-            diff = self.patch_manager.create_diff(file_content, new_content, filename=task.file_path)
-            print(f"--- Patch for {task.file_path} ---\n{diff}\n-----------------------------")
-            logger.info("Dry run completed", task_id=task.id)
-            return True
+
+            # 2. Extract Code
+            new_content = self.patch_manager.extract_code_block(response.content, language=task.language)
+            if not new_content:
+                logger.error("Failed to extract code from LLM response", attempt=attempts)
+                attempts += 1
+                continue
+
+            # 3. Apply Fix (or Dry Run)
+            if not apply_fix:
+                diff = self.patch_manager.create_diff(original_content, new_content, filename=task.file_path)
+                print(f"--- Patch for {task.file_path} (Dry Run) ---\n{diff}\n-----------------------------")
+                logger.info("Dry run completed", task_id=task.id)
+                return True
+
+            # Apply with backup
+            if self.patch_manager.apply_patch(file_path, new_content, create_backup=True):
+                # 4. Validate
+                # We use file_path as scope for now. Ideally, we should detect the test scope.
+                validation_result = self.validator.validate(
+                    file_path,
+                    language=task.language,
+                    related_test_scope=str(file_path)
+                )
+
+                if validation_result.success:
+                    logger.info("Validation passed", task_id=task.id)
+                    self.patch_manager.cleanup_backup(file_path)
+                    task.status = "done"
+                    return True
+                else:
+                    logger.warning("Validation failed, rolling back", task_id=task.id, error=validation_result.error)
+                    self.patch_manager.revert(file_path)
+
+                    # Prepare retry prompt
+                    current_prompt = (
+                        f"{base_prompt}\n\n"
+                        f"Previous attempt failed validation ({validation_result.stage}):\n"
+                        f"Error:\n{validation_result.error}\n\n"
+                        f"Please try again and fix the error."
+                    )
+            else:
+                 logger.error("Failed to apply patch", task_id=task.id)
+
+            attempts += 1
+
+        logger.error("Task failed after retries", task_id=task.id)
+        return False

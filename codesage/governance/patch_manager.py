@@ -103,3 +103,26 @@ class PatchManager:
         except Exception as e:
             logger.error("Failed to restore backup", file_path=str(path), error=str(e))
             return False
+
+    def revert(self, file_path: str | Path) -> bool:
+        """
+        Alias for restore_backup, used for semantic clarity during rollback.
+        """
+        return self.restore_backup(file_path)
+
+    def cleanup_backup(self, file_path: str | Path) -> bool:
+        """
+        Removes the backup file if it exists.
+        """
+        path = Path(file_path)
+        backup_path = path.with_suffix(path.suffix + ".bak")
+
+        if backup_path.exists():
+            try:
+                backup_path.unlink()
+                logger.info("Backup cleaned up", backup_path=str(backup_path))
+                return True
+            except Exception as e:
+                logger.error("Failed to cleanup backup", backup_path=str(backup_path), error=str(e))
+                return False
+        return True
