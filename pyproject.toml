@@ -5,7 +5,7 @@ description = "A tool for code analysis and risk assessment."
 authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.10"
+python = ">=3.10,<4.0"
 tree-sitter = ">=0.25,<0.26"
 tree-sitter-go = ">=0.25,<0.26"
 tree-sitter-python = ">=0.25,<0.26"
@@ -25,6 +25,9 @@ lxml = ">=4.9.1"
 fastapi = "^0.103.2"
 uvicorn = "^0.23.2"
 httpx = "^0.25.0"
+openai = "^2.8.1"
+anthropic = "^0.74.1"
+backoff = "^2.2.1"
 
 
 [tool.poetry.dev-dependencies]

@@ -41,3 +41,12 @@ snapshot:
     template: "default_report"
     include_source_code: false
     max_code_lines: 20
+
+llm:
+  enabled: true
+  provider: "openai"  # "openai" or "anthropic"
+  model: "gpt-4"
+  api_key: "${OPENAI_API_KEY}" # Supports env var expansion in loader if implemented, otherwise use explicit key
+  temperature: 0.0
+  timeout: 60
+  retries: 3
