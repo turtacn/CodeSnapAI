@@ -1,0 +1,45 @@
+name: 'CodeSnapAI'
+description: 'Intelligent Code Analysis & Governance Tool'
+inputs:
+  target:
+    description: 'Path to scan'
+    required: true
+    default: '.'
+  language:
+    description: 'Language to analyze (python, go, shell)'
+    required: false
+    default: 'python'
+  reporter:
+    description: 'Reporter to use (console, json, github)'
+    required: false
+    default: 'github'
+  fail_on_high:
+    description: 'Fail if high severity issues are found'
+    required: false
+    default: 'false'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        pip install poetry
+        poetry install --only main
+
+    - name: Run Scan
+      shell: bash
+      run: |
+        ARGS=""
+        if [ "${{ inputs.fail_on_high }}" == "true" ]; then
+          ARGS="$ARGS --fail-on-high"
+        fi
+
+        # We assume the action is running in the repo root where codesage is available or installed
+        # If installed via pip/poetry, we run it.
+
+        poetry run codesage scan ${{ inputs.target }} \
+          --language ${{ inputs.language }} \
+          --reporter ${{ inputs.reporter }} \
+          --ci-mode \
+          $ARGS

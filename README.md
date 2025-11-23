@@ -241,23 +241,30 @@ codesage report \
 
 ### Example 1: CI/CD Integration
 
+You can easily integrate CodeSnapAI into your GitHub Actions workflow using our official action.
+
 ```yaml
-# .github/workflows/code-quality.yml
-name: Code Quality Gate
+# .github/workflows/codesnap_audit.yml
+name: CodeSnapAI Security Audit
 on: [pull_request]
 
 jobs:
-  complexity-check:
+  audit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
-      - uses: actions/checkout@v3
-      - name: Install CodeSnapAI
-        run: pip install codesage
-      
-      - name: Complexity Analysis
-        run: |
-          codesage scan . --threshold cyclomatic=12 --output report.json
-          codesage gate report.json --max-violations 5
+      - uses: actions/checkout@v4
+      - name: Run CodeSnapAI
+        uses: turtacn/CodeSnapAI@main # Replace with tagged version in production
+        with:
+          target: "."
+          language: "python"
+          fail_on_high: "true"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### Example 2: Python Library Usage

@@ -1,13 +1,17 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from typing import List, Optional
+import json
 
 from codesage.config.web import WebConsoleConfig
 from codesage.web.loader import load_snapshot, load_report, load_governance_plan
 from codesage.config.loader import load_config
 from codesage.config.org import OrgConfig
 from codesage.org.aggregator import OrgAggregator
+from codesage.snapshot.versioning import SnapshotVersionManager
 from codesage.web.api_models import (
     ApiProjectSummary,
     ApiFileListItem,
@@ -22,6 +26,7 @@ from codesage.report.generator import ReportGenerator
 
 def create_app(config: WebConsoleConfig) -> "FastAPI":
     app = FastAPI()
+    templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
     def find_task_in_plan(plan: GovernancePlan, task_id: str):
         for group in plan.groups:
@@ -29,6 +34,102 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
                 if task.id == task_id:
                     return task
         return None
+
+    @app.post("/api/snapshot/upload")
+    async def upload_snapshot(file: UploadFile = File(...)):
+        try:
+            content = await file.read()
+            # Assuming JSON for now, but could be YAML
+            # We would typically save this to the snapshots directory
+            # For this simplified version, we might just validate it
+            snapshot_data = json.loads(content)
+            # Basic validation that it looks like a snapshot
+            if "metadata" not in snapshot_data:
+                 raise HTTPException(status_code=400, detail="Invalid snapshot format")
+
+            # Save logic
+            # We need to construct a Manager. Since we don't have the full config passed here,
+            # we rely on the web console config's snapshot_path which is likely a FILE path for reading,
+            # but for uploading we need a directory.
+
+            # Assuming config.snapshot_path is a file path to load, we derive the directory
+            snapshot_dir = Path(config.snapshot_path).parent
+
+            # Or use default snapshot dir
+            from codesage.cli.commands.snapshot import SNAPSHOT_DIR, DEFAULT_CONFIG
+
+            # We try to respect the configured path if it looks like a directory, otherwise default
+            if Path(config.snapshot_path).is_dir():
+                save_dir = config.snapshot_path
+            else:
+                save_dir = SNAPSHOT_DIR
+
+            manager = SnapshotVersionManager(save_dir, DEFAULT_CONFIG['snapshot'])
+
+            # SnapshotVersionManager expects a ProjectSnapshot object, so we need to parse the dict
+            from codesage.snapshot.models import ProjectSnapshot
+            try:
+                snapshot_obj = ProjectSnapshot(**snapshot_data)
+                saved_path = manager.save_snapshot(snapshot_obj, format='json')
+                return {"status": "success", "message": "Snapshot uploaded successfully", "path": str(saved_path)}
+            except Exception as e:
+                 raise HTTPException(status_code=400, detail=f"Invalid snapshot data: {e}")
+
+        except json.JSONDecodeError:
+             raise HTTPException(status_code=400, detail="Invalid JSON")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/dashboard/{snapshot_id}", response_class=HTMLResponse)
+    async def view_dashboard(request: Request, snapshot_id: str):
+        try:
+            # For now, we load from the configured path regardless of ID if it's 'latest'
+            # or we could implement loading specific versions via SnapshotVersionManager
+            if snapshot_id == 'latest':
+                snapshot_path = Path(config.snapshot_path)
+            else:
+                # TODO: Implement loading specific versions
+                snapshot_path = Path(config.snapshot_path)
+
+            snapshot = load_snapshot(snapshot_path)
+
+            # Generate Mermaid Graph
+            mermaid_graph = "graph TD;\n"
+            # Simple approach: graph files based on dependency graph
+            # If dependency_graph is available
+            if snapshot.dependency_graph:
+                # Limit to top 20 edges to avoid clutter
+                edges = snapshot.dependency_graph.edges[:20] if snapshot.dependency_graph.edges else []
+                for source, target in edges:
+                     # Sanitize IDs
+                    s = source.replace("/", "_").replace(".", "_").replace("-", "_")
+                    t = target.replace("/", "_").replace(".", "_").replace("-", "_")
+                    mermaid_graph += f"    {s}[{source}] --> {t}[{target}];\n"
+
+            # Fallback if no edges or empty graph: visualize high risk files
+            if not snapshot.dependency_graph or not snapshot.dependency_graph.edges:
+                 # Show high risk files as nodes
+                 high_risk = [f for f in snapshot.files if f.risk and f.risk.level == 'high']
+                 for f in high_risk[:10]:
+                     s = f.path.replace("/", "_").replace(".", "_").replace("-", "_")
+                     mermaid_graph += f"    {s}[{f.path}]:::highRisk;\n"
+                 mermaid_graph += "    classDef highRisk fill:#f00,color:#fff;\n"
+
+            if mermaid_graph == "graph TD;\n":
+                 mermaid_graph = "graph TD;\n    NoData[No Dependency Data Available];"
+
+            return templates.TemplateResponse(
+                "dashboard.html",
+                {
+                    "request": request,
+                    "snapshot": snapshot,
+                    "dependency_graph_mermaid": mermaid_graph
+                }
+            )
+        except FileNotFoundError:
+             raise HTTPException(status_code=404, detail="Snapshot not found")
+        except Exception as e:
+             raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/api/project/summary", response_model=ApiProjectSummary)
     def get_project_summary():

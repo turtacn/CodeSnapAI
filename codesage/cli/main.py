@@ -4,6 +4,7 @@ from codesage import __version__
 # Placeholder for commands
 from .commands.analyze import analyze
 from .commands.snapshot import snapshot
+from .commands.scan import scan
 from .commands.diff import diff
 from .commands.config import config
 from .commands.report import report
@@ -49,6 +50,7 @@ def main(ctx, config_path, verbose, no_color):
 
 main.add_command(analyze)
 main.add_command(snapshot)
+main.add_command(scan)
 main.add_command(diff)
 main.add_command(config)
 main.add_command(report)
