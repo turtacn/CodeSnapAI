@@ -46,6 +46,7 @@ class FileRisk(BaseModel):
     risk_score: float = Field(..., description="The calculated risk score (0-1).")
     level: Literal["low", "medium", "high"] = Field(..., description="The risk level.")
     factors: List[str] = Field(default_factory=list, description="Factors contributing to the risk score.")
+    sub_scores: Dict[str, float] = Field(default_factory=dict, description="Detailed scores for each risk dimension.")
 
 class IssueLocation(BaseModel):
     file_path: str = Field(..., description="The path to the file where the issue was found.")

@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage line-rate="0.5" branch-rate="0.5" lines-covered="10" lines-valid="20" branches-covered="5" branches-valid="10" complexity="2.0" version="1.0" timestamp="1700000000">
+	<sources>
+		<source>/app/src</source>
+	</sources>
+	<packages>
+		<package name="com.example" line-rate="0.5" branch-rate="0.5" complexity="2.0">
+			<classes>
+				<class name="Main" filename="src/main.py" line-rate="1.0" branch-rate="1.0" complexity="1.0">
+					<methods>
+						<method name="main" signature="()V" line-rate="1.0" branch-rate="1.0" complexity="1.0">
+							<lines>
+								<line number="10" hits="1" branch="false"/>
+							</lines>
+						</method>
+					</methods>
+					<lines>
+						<line number="10" hits="1" branch="false"/>
+					</lines>
+				</class>
+                <class name="Utils" filename="src/utils.py" line-rate="0.0" branch-rate="0.0" complexity="3.0">
+					<methods>
+					</methods>
+					<lines>
+						<line number="5" hits="0" branch="false"/>
+					</lines>
+				</class>
+			</classes>
+		</package>
+	</packages>
+</coverage>
