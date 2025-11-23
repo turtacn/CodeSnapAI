@@ -3,13 +3,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
-from codesage.analyzers.python_parser import PythonParser
+from codesage.analyzers.java_parser import JavaParser
 from codesage.config.risk_baseline import RiskBaselineConfig
-from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
-from codesage.risk.python_complexity import analyze_file_complexity
 from codesage.risk.risk_scorer import score_file_risk, summarize_project_risk
-from codesage.rules.engine import RuleEngine
-from codesage.rules.python_ruleset_baseline import get_python_baseline_rules
 from codesage.snapshot.models import (
     ProjectSnapshot,
     FileSnapshot,
@@ -22,15 +18,15 @@ from codesage.snapshot.models import (
 class SnapshotConfig(dict):
     pass
 
-from codesage.semantic_digest.base_builder import BaseLanguageSnapshotBuilder, SnapshotConfig
+from codesage.semantic_digest.base_builder import BaseLanguageSnapshotBuilder
 
 
-class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
+class JavaSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
     def __init__(self, root_path: Path, config: SnapshotConfig) -> None:
         super().__init__(root_path, config)
-        self.parser = PythonParser()
+        self.parser = JavaParser()
         self.risk_config = RiskBaselineConfig.from_defaults()
-        self.rules_config = RulesPythonBaselineConfig.default() # This would be loaded from main config in a real app
+        # TODO: Add Java specific rules config if needed
 
     def build(self) -> ProjectSnapshot:
         files = self._collect_files()
@@ -43,7 +39,7 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
         project_risk_summary = self._build_project_risk_summary(file_snapshots)
 
         metadata = SnapshotMetadata(
-            version="1.1", # Version bump for new features
+            version="1.1",
             timestamp=datetime.now(timezone.utc),
             project_name=self.root_path.name,
             file_count=len(file_snapshots),
@@ -59,16 +55,32 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
             risk_summary=project_risk_summary,
         )
 
-        # Run the rule engine as the final step
-        if self.rules_config.enabled:
-            rules = get_python_baseline_rules(self.rules_config)
-            engine = RuleEngine(rules=rules)
-            project = engine.run(project, self.rules_config)
-
+        # TODO: Run rule engine for Java
         return project
 
     def _collect_files(self) -> List[Path]:
-        return list(self.root_path.rglob("*.py"))
+        files = []
+        ignore_paths = self.config.get("ignore_paths", ["target/", "build/", ".gradle/", ".mvn/"])
+
+        for file_path in self.root_path.rglob("*.java"):
+            # Normalize path parts for checking
+            relative_path = str(file_path.relative_to(self.root_path))
+
+            # Check ignore paths
+            ignored = False
+            for ignore in ignore_paths:
+                if ignore.endswith("/"):
+                    # Directory match
+                     if ignore.strip("/") in file_path.parts:
+                         ignored = True
+                         break
+                elif ignore in relative_path:
+                    ignored = True
+                    break
+
+            if not ignored:
+                files.append(file_path)
+        return files
 
     def _build_file_snapshot(self, file_path: Path) -> FileSnapshot:
         source_code = file_path.read_text()
@@ -76,43 +88,43 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
 
         functions = self.parser.extract_functions()
         classes = self.parser.extract_classes()
-        variables = self.parser.extract_variables()
         imports = self.parser.extract_imports()
+        package = self.parser.extract_package()
 
-        complexity_results = analyze_file_complexity(source_code, self.risk_config.threshold_complexity_high)
+        # Prepend package to class names for Fully Qualified Name
+        if package:
+            for cls in classes:
+                cls.name = f"{package}.{cls.name}"
 
-        # Create a map of function name to complexity
-        if complexity_results:
-            complexity_map = {
-                f.name: f.complexity for f in complexity_results.functions
-            }
-            for func in functions:
-                func.cyclomatic_complexity = complexity_map.get(func.name, 1)
-                # Sample code if complexity is high
-                if func.cyclomatic_complexity >= self.risk_config.threshold_complexity_high:
-                    # Very basic sampling: first 5 lines of the function
-                    # Ideally we would use the parser's start_line/end_line to slice the source
-                    # But we don't have easy access to line-based source here without splitting
-                    lines = source_code.splitlines()
-                    start = func.start_line
-                    end = min(func.end_line, start + 5)
-                    func.value = "\n".join(lines[start:end]) # Store sample in 'value' generic field
+        complexity_results = self.parser.get_complexity_metrics(source_code)
+
+        # Calculate max complexity from functions
+        max_complexity = 0
+        high_complexity_functions = 0
+        total_complexity = 0
+
+        for func in functions:
+            if func.complexity > max_complexity:
+                max_complexity = func.complexity
+            if func.complexity > self.risk_config.threshold_complexity_high:
+                high_complexity_functions += 1
+            total_complexity += func.complexity
+
+        avg_complexity = total_complexity / len(functions) if functions else 0.0
 
         fan_in, fan_out = self._calculate_fan_in_out(str(file_path.relative_to(self.root_path)))
 
         metrics = FileMetrics(
-            lines_of_code=complexity_results.loc if complexity_results else 0,
+            lines_of_code=len(source_code.splitlines()),
             num_functions=len(functions),
             num_types=len(classes),
             language_specific={
-                "python": {
+                "java": {
                     "num_classes": len(classes),
-                    "num_methods": sum(len(c.methods) for c in classes),
-                    "has_async": any(f.is_async for f in functions) or any(m.is_async for c in classes for m in c.methods),
-                    "uses_type_hints": False,  # Placeholder
-                    "max_cyclomatic_complexity": complexity_results.max_cyclomatic_complexity if complexity_results else 0,
-                    "avg_cyclomatic_complexity": complexity_results.avg_cyclomatic_complexity if complexity_results else 0.0,
-                    "high_complexity_functions": complexity_results.high_complexity_functions if complexity_results else 0,
+                    "num_methods": len(functions), # functions list includes all methods found in AST
+                    "max_cyclomatic_complexity": max_complexity,
+                    "avg_cyclomatic_complexity": avg_complexity,
+                    "high_complexity_functions": high_complexity_functions,
                     "fan_in": fan_in,
                     "fan_out": fan_out,
                 }
@@ -123,15 +135,13 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
 
         symbols = {
             "classes": [c.model_dump() for c in classes],
-            "functions": [f.model_dump() for f in functions],
-            "variables": [v.model_dump() for v in variables],
+            "functions": [f.model_dump() for f in functions], # Java methods are top-level constructs in our model for now? No, they are inside classes mostly. But extract_functions returns them.
             "imports": [i.model_dump() for i in imports],
-            "functions_detail": [f.model_dump() for f in functions], # For richer rule context
         }
 
         return FileSnapshot(
             path=str(file_path.relative_to(self.root_path)),
-            language="python",
+            language="java",
             metrics=metrics,
             symbols=symbols,
             risk=file_risk,

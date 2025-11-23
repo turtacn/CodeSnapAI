@@ -76,10 +76,60 @@ class PythonParser(BaseParser):
                 bases_node = node.child_by_field_name("superclasses")
 
                 methods = []
+                fields = []
                 body = node.child_by_field_name("body")
                 if body:
+                    # Capture class attributes (fields) first
                     for child in body.children:
-                        if child.type in ("function_definition", "async_function_definition"):
+                        assignment = None
+                        # Check for direct assignment or wrapped in expression_statement
+                        if child.type in ("assignment", "annotated_assignment"):
+                             assignment = child
+                        elif child.type == "expression_statement":
+                            child_node = child.child(0)
+                            if child_node.type in ("assignment", "annotated_assignment"):
+                                assignment = child_node
+
+                        if assignment:
+                            left = assignment.child_by_field_name("left")
+                            if left and left.type == "identifier":
+                                field_name = self._text(left)
+                                type_name = None
+                                if assignment.type == "annotated_assignment":
+                                    type_node = assignment.child_by_field_name("type")
+                                    if type_node:
+                                        type_name = self._text(type_node)
+                                    else:
+                                        # Fallback to index based access: left, type, value
+                                        # 0: left, 1: :, 2: type, 3: =, 4: value
+                                        # Try named child index 1 (0 is left, 1 is type, 2 is value)
+                                        if assignment.named_child_count > 1:
+                                            type_node = assignment.named_child(1)
+                                            if type_node:
+                                                type_name = self._text(type_node)
+                                elif assignment.type == "assignment":
+                                    # Regular assignment doesn't have type
+                                    pass
+
+                                # For annotated assignment, right side is "value", for assignment it is "right"
+                                right = assignment.child_by_field_name("value")
+                                if not right:
+                                    right = assignment.child_by_field_name("right")
+                                value = self._text(right) if right else None
+                                if value and len(value) > 30:
+                                    value = value[:30] + "..."
+
+                                fields.append(VariableNode(
+                                    node_type="variable",
+                                    name=field_name,
+                                    value=value,
+                                    kind="field",
+                                    type_name=type_name,
+                                    is_exported=not field_name.startswith("_"),
+                                    start_line=child.start_point[0],
+                                    end_line=child.end_point[0]
+                                ))
+                        elif child.type in ("function_definition", "async_function_definition"):
                             methods.append(self._build_function_node(child))
 
                 base_classes = []
@@ -94,6 +144,7 @@ class PythonParser(BaseParser):
                     node_type="class",
                     name=name,
                     methods=methods,
+                    fields=fields,
                     base_classes=base_classes,
                     is_exported=is_exported
                 ))
@@ -106,27 +157,52 @@ class PythonParser(BaseParser):
 
         for node in self._walk(self.tree.root_node):
             if node.type == "import_statement":
-                for name in node.children:
-                    if name.type == "dotted_name":
-                        alias_node = name.parent.child_by_field_name('alias')
+                for child in node.children:
+                    # In import_statement, we want dotted_name or aliased_import
+                    if child.type == "dotted_name":
                         imports.append(ImportNode(
                             node_type="import",
-                            path=self._text(name),
-                            alias=self._text(alias_node) if alias_node else None,
+                            path=self._text(child),
+                            alias=None,
+                            lineno=node.start_point[0] + 1
+                        ))
+                    elif child.type == "aliased_import":
+                        name_node = child.child_by_field_name("name")
+                        alias_node = child.child_by_field_name("alias")
+                        imports.append(ImportNode(
+                            node_type="import",
+                            path=self._text(name_node),
+                            alias=self._text(alias_node),
+                            lineno=node.start_point[0] + 1
                         ))
 
             if node.type == "import_from_statement":
                 module_name_node = node.child_by_field_name('module_name')
                 if module_name_node:
                     module_name = self._text(module_name_node)
-                    for name in node.children:
-                        if name.type == "dotted_name":
-                            alias_node = name.parent.child_by_field_name('alias')
+                    # Iterate children to find imported names, excluding module_name
+                    for child in node.children:
+                        # Avoid reprocessing module_name if it is a dotted_name
+                        if child == module_name_node:
+                            continue
+
+                        if child.type == "dotted_name":
                             imports.append(ImportNode(
                                 node_type="import",
-                                path=f"{module_name}.{self._text(name)}",
-                                alias=self._text(alias_node) if alias_node else None,
-                                is_relative='.' in module_name
+                                path=f"{module_name}.{self._text(child)}",
+                                alias=None,
+                                is_relative='.' in module_name,
+                                lineno=node.start_point[0] + 1
+                            ))
+                        elif child.type == "aliased_import":
+                            name_node = child.child_by_field_name("name")
+                            alias_node = child.child_by_field_name("alias")
+                            imports.append(ImportNode(
+                                node_type="import",
+                                path=f"{module_name}.{self._text(name_node)}",
+                                alias=self._text(alias_node),
+                                is_relative='.' in module_name,
+                                lineno=node.start_point[0] + 1
                             ))
         return imports
 

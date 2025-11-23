@@ -41,6 +41,7 @@ class ImportNode(ASTNode):
     path: str
     alias: Optional[str] = None
     is_relative: bool = False
+    lineno: int = 0
 
 class FileAST(BaseModel):
     path: str

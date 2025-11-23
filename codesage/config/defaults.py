@@ -15,11 +15,12 @@ DEFAULT_CONFIG = {
     "languages": {
         "python": {"extensions": [".py"]},
         "go": {"extensions": [".go"]},
+        "java": {"extensions": [".java"]},
         "javascript": {"extensions": [".js", "jsx"]},
         "typescript": {"extensions": [".ts", ".tsx"]},
     },
     "thresholds": {"complexity": 20, "duplication": 10},
-    "ignore_paths": ["node_modules/", "vendor/", "tests/"],
+    "ignore_paths": ["node_modules/", "vendor/", "tests/", "target/", "build/", ".gradle/", ".mvn/"],
     "snapshot": {
         "python": PythonSnapshotConfig().model_dump(),
     },
