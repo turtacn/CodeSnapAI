@@ -7,8 +7,11 @@ from typing import Optional
 from codesage.semantic_digest.python_snapshot_builder import PythonSemanticSnapshotBuilder, SnapshotConfig
 from codesage.semantic_digest.go_snapshot_builder import GoSemanticSnapshotBuilder
 from codesage.semantic_digest.shell_snapshot_builder import ShellSemanticSnapshotBuilder
-from codesage.snapshot.models import ProjectSnapshot
+from codesage.snapshot.models import ProjectSnapshot, Issue, IssueLocation
 from codesage.reporters import ConsoleReporter, JsonReporter, GitHubPRReporter
+from codesage.cli.plugin_loader import PluginManager
+from codesage.history.store import StorageEngine
+from codesage.core.interfaces import CodeIssue
 
 def get_builder(language: str, path: Path):
     config = SnapshotConfig()
@@ -28,11 +31,25 @@ def get_builder(language: str, path: Path):
 @click.option('--output', '-o', help='Output path for JSON reporter.')
 @click.option('--fail-on-high', is_flag=True, help='Exit with non-zero code if high severity issues are found.')
 @click.option('--ci-mode', is_flag=True, help='Enable CI mode (auto-detect GitHub environment).')
+@click.option('--plugins-dir', default='.codesage/plugins', help='Directory containing plugins.')
+@click.option('--db-url', default='sqlite:///codesage.db', help='Database URL for storage.')
 @click.pass_context
-def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode):
+def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_dir, db_url):
     """
     Scan the codebase and report issues.
     """
+    # 1. Initialize Database
+    try:
+        storage = StorageEngine(db_url)
+        click.echo(f"Connected to storage: {db_url}")
+    except Exception as e:
+        click.echo(f"Warning: Could not connect to storage: {e}", err=True)
+        storage = None
+
+    # 2. Load Plugins
+    plugin_manager = PluginManager(plugins_dir)
+    plugin_manager.load_plugins()
+
     click.echo(f"Scanning {path} for {language}...")
 
     root_path = Path(path)
@@ -44,6 +61,57 @@ def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode):
 
     try:
         snapshot: ProjectSnapshot = builder.build()
+
+        # 3. Apply Custom Rules (Plugins)
+        for rule in plugin_manager.rules:
+            for file_path, file_snapshot in snapshot.files.items():
+                try:
+                    content = ""
+                    full_path = root_path / file_path
+                    if full_path.exists():
+                        content = full_path.read_text(errors='ignore')
+
+                    issues = rule.check(str(file_path), content, {})
+                    if issues:
+                        for i in issues:
+                            # Convert plugin CodeIssue to standard Issue model
+
+                            # Map severity to Issue severity Literal
+                            severity = "warning"
+                            if i.severity.lower() in ["info", "warning", "error"]:
+                                severity = i.severity.lower()
+                            elif i.severity.lower() == "high":
+                                severity = "error"
+                            elif i.severity.lower() == "low":
+                                severity = "info"
+
+                            new_issue = Issue(
+                                rule_id=rule.id,
+                                severity=severity,
+                                message=i.description,
+                                location=IssueLocation(
+                                    file_path=str(file_path),
+                                    line=i.line_number
+                                ),
+                                symbol=None,
+                                tags=["custom-rule"]
+                            )
+
+                            if file_snapshot.issues is None:
+                                file_snapshot.issues = []
+                            file_snapshot.issues.append(new_issue)
+
+                except Exception as e:
+                     click.echo(f"Error running rule {rule.id} on {file_path}: {e}", err=True)
+
+        # 4. Save to Storage
+        if storage:
+            try:
+                storage.save_snapshot(snapshot.metadata.project_name, snapshot)
+                click.echo("Snapshot saved to database.")
+            except Exception as e:
+                 click.echo(f"Failed to save snapshot: {e}", err=True)
+
     except Exception as e:
         click.echo(f"Scan failed: {e}", err=True)
         ctx.exit(1)

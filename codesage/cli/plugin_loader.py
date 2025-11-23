@@ -1,50 +1,77 @@
 import importlib.util
 import inspect
 import os
+import sys
+import logging
 from pathlib import Path
-import click
+from typing import List, Type
 
-def load_plugins(cli_group, plugins_dir=".codesage/plugins"):
-    """
-    Dynamically loads plugins from the specified directory.
-    """
-    plugins_path = Path(plugins_dir)
-    if not plugins_path.exists():
-        return
+from codesage.core.interfaces import Plugin, Rule, Analyzer
 
-    for plugin_file in plugins_path.glob("*.py"):
-        try:
-            spec = importlib.util.spec_from_file_location(plugin_file.stem, plugin_file)
-            plugin_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(plugin_module)
+logger = logging.getLogger(__name__)
 
-            if hasattr(plugin_module, 'register_command') and callable(plugin_module.register_command):
-                plugin_module.register_command(cli_group)
-            else:
-                click.echo(f"Warning: Plugin {plugin_file.name} does not have a 'register_command' function.", err=True)
-        except Exception as e:
-            click.echo(f"Warning: Could not load plugin {plugin_file.name}: {e}", err=True)
+class PluginManager:
+    def __init__(self, plugin_dir: str):
+        self.plugin_dir = Path(plugin_dir)
+        self.loaded_plugins: List[Plugin] = []
+        self.rules: List[Rule] = []
+        self.analyzers: List[Analyzer] = []
 
-if __name__ == '__main__':
-    @click.group()
-    def cli():
-        pass
+    def load_plugins(self, engine_context=None):
+        """
+        Scans plugin_dir for .py files and loads them.
+        """
+        if not self.plugin_dir.exists():
+            logger.warning(f"Plugin directory {self.plugin_dir} does not exist.")
+            return
 
-    # To test, create a dummy plugin file in .codesage/plugins
-    # e.g., .codesage/plugins/my_plugin.py
-    # import click
-    # def register_command(cli_group):
-    #     @cli_group.command()
-    #     def hello():
-    #         click.echo("Hello from plugin!")
+        logger.info(f"Scanning for plugins in {self.plugin_dir}")
+        sys.path.insert(0, str(self.plugin_dir))
 
-    os.makedirs(".codesage/plugins", exist_ok=True)
-    with open(".codesage/plugins/my_plugin.py", "w") as f:
-        f.write("import click\n")
-        f.write("def register_command(cli_group):\n")
-        f.write("    @cli_group.command()\n")
-        f.write("    def hello():\n")
-        f.write("        click.echo('Hello from plugin!')\n")
+        for plugin_file in self.plugin_dir.glob("*.py"):
+            if plugin_file.name.startswith("__"):
+                continue
 
-    load_plugins(cli)
-    cli()
+            try:
+                module_name = plugin_file.stem
+                spec = importlib.util.spec_from_file_location(module_name, plugin_file)
+                if not spec or not spec.loader:
+                    continue
+
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                # Check for classes implementing Plugin interface
+                found_plugin = False
+                for name, obj in inspect.getmembers(module):
+                    if inspect.isclass(obj) and issubclass(obj, Plugin) and obj is not Plugin:
+                        try:
+                            plugin_instance = obj()
+                            plugin_instance.register(self)
+                            self.loaded_plugins.append(plugin_instance)
+                            found_plugin = True
+                            logger.info(f"Loaded plugin: {name}")
+                        except Exception as e:
+                            logger.error(f"Error registering plugin {name}: {e}")
+
+                if not found_plugin:
+                    # Fallback: check for a standalone 'register' function
+                    if hasattr(module, 'register') and callable(module.register):
+                        try:
+                            module.register(self)
+                            logger.info(f"Loaded plugin from module: {module_name}")
+                        except Exception as e:
+                            logger.error(f"Error executing register() in {module_name}: {e}")
+
+            except Exception as e:
+                logger.error(f"Failed to load plugin {plugin_file.name}: {e}")
+
+    def register_rule(self, rule: Rule):
+        self.rules.append(rule)
+        logger.debug(f"Registered rule: {rule.id}")
+
+    def register_analyzer(self, analyzer: Analyzer):
+        self.analyzers.append(analyzer)
+        logger.debug(f"Registered analyzer: {analyzer.id}")
+
+# Helper to expose a default manager if needed, but likely instantiated in CLI
