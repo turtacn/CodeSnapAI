@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 from pydantic import BaseModel
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 
 from codesage.config.jules import JulesPromptConfig
 from codesage.governance.task_models import GovernanceTask
@@ -96,3 +96,26 @@ def build_view_and_template_for_task(
     template = get_template_for_rule(task.rule_id, task.language)
 
     return view, template
+
+class JulesBridge:
+    def extract_patch_context(self, jules_suggestion: Dict) -> Dict:
+        """
+        Extracts patch context from Jules' suggestion.
+
+        Args:
+            jules_suggestion: {
+                "issue_id": "...",
+                "suggested_fix": {
+                    "function": "calculate_risk",
+                    "location": {"file": "...", "line": 45},
+                    "new_code": "...",
+                    "context_snippet": "..."
+                }
+            }
+        """
+        fix = jules_suggestion.get("suggested_fix", {})
+        return {
+            "function_name": fix.get("function"),
+            "line_number": fix.get("location", {}).get("line"),
+            "code_snippet": fix.get("context_snippet")
+        }
