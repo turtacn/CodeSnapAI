@@ -1,103 +1,108 @@
-import unittest
+
+import pytest
+from datetime import datetime
 from unittest.mock import MagicMock, patch
+
 from codesage.risk.risk_scorer import RiskScorer
 from codesage.config.risk_baseline import RiskBaselineConfig
-from codesage.snapshot.models import ProjectSnapshot, FileSnapshot, FileMetrics, SnapshotMetadata, DependencyGraph
+from codesage.snapshot.models import ProjectSnapshot, FileSnapshot, FileMetrics, SnapshotMetadata, FileRisk
 
-class TestRiskIntegration(unittest.TestCase):
-    def setUp(self):
-        self.config = RiskBaselineConfig()
+@pytest.fixture
+def mock_snapshot():
+    meta = SnapshotMetadata(
+        version="v1",
+        timestamp=datetime.now(),
+        project_name="test_proj",
+        file_count=2,
+        total_size=100,
+        tool_version="1.0",
+        config_hash="abc"
+    )
 
-        # Mock GitMiner
-        self.patcher_git = patch('codesage.risk.risk_scorer.GitMiner')
-        self.MockGitMiner = self.patcher_git.start()
-        self.mock_git_miner = self.MockGitMiner.return_value
-
-        # Mock CoverageScorer
-        self.patcher_cov = patch('codesage.risk.risk_scorer.CoverageScorer')
-        self.MockCoverageScorer = self.patcher_cov.start()
-        self.mock_cov_scorer = self.MockCoverageScorer.return_value
-
-        self.scorer = RiskScorer(self.config)
-
-        # By default mock coverage returns 1.0 (full coverage) unless specified
-        self.mock_cov_scorer.get_coverage.return_value = 1.0
-
-        # By default churn is 0
-        self.mock_git_miner.get_file_churn.return_value = 0
-
-    def tearDown(self):
-        self.patcher_git.stop()
-        self.patcher_cov.stop()
-
-    def test_full_scoring(self):
-        # Create a snapshot with 3 files
-        # A (High Complexity, High Churn, Low Coverage) -> Risk should be very high
-        # B (Low Complexity, Low Churn, Full Coverage)
-        # C (Medium Complexity)
-
-        metadata = SnapshotMetadata(
-            version="1", timestamp="2023-01-01", project_name="test",
-            file_count=3, total_size=100, tool_version="1.0", config_hash="abc"
+    file1 = FileSnapshot(
+        path="src/complex.py",
+        language="python",
+        content="def foo(): pass",
+        metrics=FileMetrics(
+            lines_of_code=200,
+            language_specific={
+                "python": {
+                    "max_cyclomatic_complexity": 20, # High
+                    "avg_cyclomatic_complexity": 10.0,
+                    "fan_out": 10
+                }
+            }
         )
+    )
 
-        # File A: High risk
-        metrics_a = FileMetrics(
-            lines_of_code=2000,
-            language_specific={"python": {"max_cyclomatic_complexity": 20, "avg_cyclomatic_complexity": 10, "fan_out": 30}}
+    file2 = FileSnapshot(
+        path="src/simple.py",
+        language="python",
+        content="print('hello')",
+        metrics=FileMetrics(
+            lines_of_code=10,
+            language_specific={
+                "python": {
+                    "max_cyclomatic_complexity": 1,
+                    "avg_cyclomatic_complexity": 1.0,
+                    "fan_out": 0
+                }
+            }
         )
-        # Static Score A calculation:
-        # max_cc(20) > threshold(10) -> norm=1.0 * 0.4 = 0.4
-        # avg_cc(10) > threshold(10) -> norm=1.0 * 0.3 = 0.3
-        # fan_out(30) > 20 -> norm=1.0 * 0.2 = 0.2
-        # loc(2000) > 1000 -> norm=1.0 * 0.1 = 0.1
-        # Total Static A = 1.0
+    )
 
-        # Churn A: High
-        self.mock_git_miner.get_file_churn.side_effect = lambda f, **kwargs: 20 if f == "A" else 0
+    return ProjectSnapshot(
+        metadata=meta,
+        files=[file1, file2],
+        languages=["python"]
+    )
 
-        # Coverage A: Low (0.0)
-        self.mock_cov_scorer.get_coverage.side_effect = lambda f: 0.0 if f == "A" else 1.0
+def test_risk_scorer_integration_static_only(mock_snapshot):
+    config = RiskBaselineConfig()
+    scorer = RiskScorer(config)
 
-        file_a = FileSnapshot(path="A", language="python", metrics=metrics_a)
+    scored_snapshot = scorer.score_project(mock_snapshot)
 
-        # File B: Low risk, but depends on A
-        metrics_b = FileMetrics(lines_of_code=10)
-        file_b = FileSnapshot(path="B", language="python", metrics=metrics_b)
+    f1 = next(f for f in scored_snapshot.files if f.path == "src/complex.py")
+    f2 = next(f for f in scored_snapshot.files if f.path == "src/simple.py")
 
-        snapshot = ProjectSnapshot(
-            metadata=metadata,
-            files=[file_a, file_b],
-            dependencies=DependencyGraph(edges=[("B", "A")]) # B -> A
-        )
+    # Static score for f1 should be high because max_cc=20
+    # In my logic: 0.5 * min(20/15, 1) + ...
+    # 0.5 * 1 + 0.3 * 1 + 0.2 * 0.5 = 0.9 * 10 = 9.0 complexity
 
-        # Set coverage file to trigger scorer usage
-        self.scorer.set_coverage_report("dummy.xml")
+    # Static score only contributed 30% to total risk (weight_complexity=0.3)
+    # Risk = 0.3 * 9.0 = 2.7.
+    # Plus file_size=200 lines -> 2.0. weight=0.1 -> 0.2
+    # Total ~ 2.9 (Low)
 
-        # Run scoring
-        result = self.scorer.score_project(snapshot)
+    assert f1.risk.risk_score > f2.risk.risk_score
+    assert f1.risk.sub_scores["complexity"] > 5.0
 
-        # Check A
-        res_a = next(f for f in result.files if f.path == "A")
-        # Ensure it has high risk
-        self.assertAlmostEqual(res_a.risk.risk_score, 1.0, delta=0.01)
-        self.assertIn("high_complexity", res_a.risk.factors)
+    # Ensure churn/coverage is 0 (as not provided)
+    assert f1.risk.sub_scores["churn"] == 0.0
+    assert f1.risk.sub_scores["coverage"] == 0.0
 
-        # Check B
-        res_b = next(f for f in result.files if f.path == "B")
-        # B should have propagated risk from A
-        self.assertAlmostEqual(res_b.risk.risk_score, 0.2, delta=0.01)
+@patch("codesage.git.miner.GitMiner.get_file_churn_score")
+@patch("codesage.git.miner.GitMiner.get_file_author_count")
+def test_risk_scorer_integration_with_churn(mock_author, mock_churn, mock_snapshot):
+    mock_churn.return_value = 10.0 # Max churn
+    mock_author.return_value = 5   # Max authors (5 -> 10 score)
 
-        # In risk_scorer.py:
-        # if (score - base_s) > 0.2: factors.append("risk_propagated")
-        # Base B is 0.
-        # Score B is 0.2.
-        # 0.2 > 0.2 is FALSE.
-        # So it won't have "risk_propagated".
-        # I should expect it if I lower threshold or increase risk.
+    config = RiskBaselineConfig()
+    # Pass repo_path to trigger GitMiner usage (although we mocked methods, init needs path)
+    scorer = RiskScorer(config, repo_path=".")
 
-        # Since 0.2 is not strictly greater than 0.2, factor is missing.
-        # I will change expectation or update logic to >=.
+    scored_snapshot = scorer.score_project(mock_snapshot)
+    f1 = next(f for f in scored_snapshot.files if f.path == "src/complex.py")
 
-if __name__ == '__main__':
-    unittest.main()
+    # Components:
+    # Complexity: ~9.0 * 0.3 = 2.7
+    # Churn: 10.0 * 0.25 = 2.5
+    # Author: 10.0 * 0.1 = 1.0
+    # Size: 2.0 * 0.1 = 0.2
+    # Coverage: 0.0
+    # Total: 2.7 + 2.5 + 1.0 + 0.2 = 6.4 (High)
+
+    assert f1.risk.risk_score >= 6.0
+    assert f1.risk.level in ["high", "critical"]
+    assert "high_churn" in f1.risk.factors

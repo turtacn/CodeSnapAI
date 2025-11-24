@@ -44,7 +44,7 @@ class FileMetrics(BaseModel):
 
 class FileRisk(BaseModel):
     risk_score: float = Field(..., description="The calculated risk score (0-1).")
-    level: Literal["low", "medium", "high"] = Field(..., description="The risk level.")
+    level: Literal["low", "medium", "high", "critical"] = Field(..., description="The risk level.")
     factors: List[str] = Field(default_factory=list, description="Factors contributing to the risk score.")
     sub_scores: Dict[str, float] = Field(default_factory=dict, description="Detailed scores for each risk dimension.")
 
@@ -97,6 +97,8 @@ class LLMCallStats(BaseModel):
 class FileSnapshot(BaseModel):
     path: str = Field(..., description="The relative path to the file.")
     language: str = Field(..., description="The programming language of the file.")
+    content: Optional[str] = Field(None, description="The content of the file. Required for deep analysis.")
+    size: Optional[int] = Field(None, description="The size of the file in bytes.")
     metrics: Optional[FileMetrics] = Field(None, description="A summary of the file's metrics.")
     symbols: Optional[Dict[str, Any]] = Field(default_factory=dict, description="A dictionary of symbols defined in the file.")
     risk: Optional[FileRisk] = Field(None, description="Risk assessment for the file.")

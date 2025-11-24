@@ -13,6 +13,10 @@ from codesage.reporters import ConsoleReporter, JsonReporter, GitHubPRReporter
 from codesage.cli.plugin_loader import PluginManager
 from codesage.history.store import StorageEngine
 from codesage.core.interfaces import CodeIssue
+from codesage.risk.risk_scorer import RiskScorer
+from codesage.config.risk_baseline import RiskBaselineConfig
+from codesage.rules.jules_specific_rules import JULES_RULESET
+from codesage.rules.base import RuleContext
 from datetime import datetime, timezone
 
 def get_builder(language: str, path: Path):
@@ -144,8 +148,10 @@ def merge_snapshots(snapshots: List[ProjectSnapshot], project_name: str) -> Proj
 @click.option('--ci-mode', is_flag=True, help='Enable CI mode (auto-detect GitHub environment).')
 @click.option('--plugins-dir', default='.codesage/plugins', help='Directory containing plugins.')
 @click.option('--db-url', default='sqlite:///codesage.db', help='Database URL for storage.')
+@click.option('--git-repo', type=click.Path(), help='Git 仓库路径（用于变更历史分析）')
+@click.option('--coverage-report', type=click.Path(), help='覆盖率报告路径（Cobertura/JaCoCo XML）')
 @click.pass_context
-def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_dir, db_url):
+def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_dir, db_url, git_repo, coverage_report):
     """
     Scan the codebase and report issues.
     """
@@ -205,16 +211,73 @@ def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_d
         click.echo(f"Failed to merge snapshots: {e}", err=True)
         ctx.exit(1)
 
-    # 3. Apply Custom Rules (Plugins)
+    # Populate file contents if missing (needed for rules)
+    click.echo("Populating file contents...")
+    for file_snapshot in snapshot.files:
+        if not file_snapshot.content:
+            try:
+                full_path = root_path / file_snapshot.path
+                if full_path.exists():
+                    file_snapshot.content = full_path.read_text(errors='ignore')
+                    # Update size if missing
+                    if file_snapshot.size is None:
+                        file_snapshot.size = len(file_snapshot.content)
+            except Exception as e:
+                # logger.warning(f"Failed to read file {file_snapshot.path}: {e}")
+                pass
+
+    # 3. Apply Risk Scoring (Enhanced in Phase 1)
+    try:
+        risk_config = RiskBaselineConfig() # Load default config
+        scorer = RiskScorer(
+            config=risk_config,
+            repo_path=git_repo or path, # Default to scanned path if not specified
+            coverage_report=coverage_report
+        )
+        snapshot = scorer.score_project(snapshot)
+    except Exception as e:
+        click.echo(f"Warning: Risk scoring failed: {e}", err=True)
+
+    # 4. Apply Custom Rules (Plugins & Jules Rules)
+
+    # Create RuleContext
+    # We need a dummy config for now as RuleContext expects one, but JulesRules might not use it.
+    # However, PythonRulesetBaselineConfig is expected by RuleContext definition in base.py.
+    # We need to import it or mock it.
+    from codesage.config.rules_python_baseline import RulesPythonBaselineConfig
+    rule_config = RulesPythonBaselineConfig() # Default config
+
+    # Apply Jules Specific Rules
+    click.echo("Applying Jules-specific rules...")
+    for rule in JULES_RULESET:
+        for file_snapshot in snapshot.files:
+             try:
+                # Create context for this file
+                rule_ctx = RuleContext(
+                    project=snapshot,
+                    file=file_snapshot,
+                    config=rule_config
+                )
+
+                # Call rule.check(ctx)
+                # Ensure rule supports check(ctx)
+                issues = rule.check(rule_ctx)
+
+                if issues:
+                    if file_snapshot.issues is None:
+                        file_snapshot.issues = []
+                    file_snapshot.issues.extend(issues)
+             except Exception as e:
+                 click.echo(f"Error applying rule {rule.rule_id} to {file_snapshot.path}: {e}", err=True)
+
+    # Apply Plugin Rules
     for rule in plugin_manager.rules:
         # Ensure we iterate over the list of files
         for file_snapshot in snapshot.files:
             file_path = Path(file_snapshot.path)
             try:
-                content = ""
-                full_path = root_path / file_path
-                if full_path.exists():
-                    content = full_path.read_text(errors='ignore')
+                # Content is already populated now
+                content = file_snapshot.content or ""
 
                 issues = rule.check(str(file_path), content, {})
                 if issues:
@@ -249,29 +312,33 @@ def scan(ctx, path, language, reporter, output, fail_on_high, ci_mode, plugins_d
             except Exception as e:
                  click.echo(f"Error running rule {rule.id} on {file_path}: {e}", err=True)
 
-    # Recalculate Issues Summary after Plugins
-    # Simplified recalculation
+    # Recalculate Issues Summary after Plugins & Jules Rules
     total_issues = 0
     by_severity = {}
+    by_rule = {}
 
     for f in snapshot.files:
         if f.issues:
             total_issues += len(f.issues)
             for issue in f.issues:
                 by_severity[issue.severity] = by_severity.get(issue.severity, 0) + 1
+                if issue.rule_id:
+                    by_rule[issue.rule_id] = by_rule.get(issue.rule_id, 0) + 1
 
     # Update snapshot summary if issues changed
     if snapshot.issues_summary:
          snapshot.issues_summary.total_issues = total_issues
          snapshot.issues_summary.by_severity = by_severity
+         snapshot.issues_summary.by_rule = by_rule
     else:
          snapshot.issues_summary = ProjectIssuesSummary(
              total_issues=total_issues,
-             by_severity=by_severity
+             by_severity=by_severity,
+             by_rule=by_rule
          )
 
 
-    # 4. Save to Storage
+    # 5. Save to Storage
     if storage:
         try:
             storage.save_snapshot(snapshot.metadata.project_name, snapshot)
