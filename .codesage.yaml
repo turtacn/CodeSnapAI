@@ -1,66 +1,52 @@
+languages:
+  python:
+    extensions: [".py"]
+  go:
+    extensions: [".go"]
+  javascript:
+    extensions: [".js", ".jsx"]
+  typescript:
+    extensions: [".ts", ".tsx"]
+
+thresholds:
+  complexity: 20
+  duplication: 10
+
+ignore_paths:
+  - "node_modules/"
+  - "vendor/"
+  - "tests/"
+
 analyzers:
   complexity:
-    file_threshold: 200
     function_threshold: 10
+    file_threshold: 200
   dependency:
-    detect_cycles: true
     max_depth: 5
+    detect_cycles: true
   patterns:
-    enabled_rules:
-    - singleton
-    - factory
-    - god_class
-ignore_paths:
-- node_modules/
-- vendor/
-- tests/
-languages:
-  go:
-    extensions:
-    - .go
-  javascript:
-    extensions:
-    - .js
-    - .jsx
-  python:
-    extensions:
-    - .py
-  typescript:
-    extensions:
-    - .ts
-    - .tsx
-llm:
-  api_key: ${OPENAI_API_KEY}
-  enabled: true
-  model: gpt-4
-  provider: openai
-  retries: 3
-  temperature: 0.0
-  timeout: 60
+    enabled_rules: ["singleton", "factory", "god_class"]
+
 snapshot:
+  output_dir: ".codesage/snapshots"
+  formats: ["json", "markdown"]
   compression:
     enabled: true
-    exclude_patterns:
-    - '*.test.go'
-    - '*_test.py'
-  formats:
-  - json
-  - markdown
-  markdown:
-    include_source_code: false
-    max_code_lines: 20
-    template: default_report
-  output_dir: .codesage/snapshots
+    exclude_patterns: ["*.test.go", "*_test.py"]
   versioning:
     enabled: true
     max_versions: 10
     retention_days: 30
-thresholds:
-  complexity: 20
-  duplication: 10
-org:
-  projects:
-    - id: codesage
-      name: codesage
-      path: .
-      snapshot_path: v1.json
+  markdown:
+    template: "default_report"
+    include_source_code: false
+    max_code_lines: 20
+
+llm:
+  enabled: true
+  provider: "openai"  # "openai" or "anthropic"
+  model: "gpt-4"
+  api_key: "${OPENAI_API_KEY}" # Supports env var expansion in loader if implemented, otherwise use explicit key
+  temperature: 0.0
+  timeout: 60
+  retries: 3
