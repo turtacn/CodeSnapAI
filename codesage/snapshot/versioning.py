@@ -73,7 +73,7 @@ class SnapshotVersionManager:
         index.append(
             {
                 "version": metadata.version,
-                "timestamp": metadata.timestamp.isoformat(),
+                "timestamp": metadata.timestamp.astimezone(timezone.utc).isoformat(),
                 "path": snapshot_path,
                 "git_commit": metadata.git_commit,
             }
@@ -85,10 +85,17 @@ class SnapshotVersionManager:
         index = self._load_index()
         now = datetime.now(timezone.utc)
 
-        valid_snapshots = [
-            s for s in index
-            if now - datetime.fromisoformat(s["timestamp"]) <= timedelta(days=self.retention_days)
-        ]
+        valid_snapshots = []
+        for s in index:
+            try:
+                ts = datetime.fromisoformat(s["timestamp"])
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if now - ts <= timedelta(days=self.retention_days):
+                    valid_snapshots.append(s)
+            except ValueError:
+                # Skip malformed timestamps
+                continue
 
         if len(valid_snapshots) > self.max_versions:
             valid_snapshots = sorted(

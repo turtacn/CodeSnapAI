@@ -74,8 +74,7 @@ class OrgAggregator:
 
         if not report_summary:
             logger.info(f"No report found for {ref.name}, generating one from snapshot.")
-            generator = ReportGenerator.from_snapshot(snapshot, Path.cwd())
-            report_summary = generator.get_summary()
+            report_summary, _ = ReportGenerator.from_snapshot(snapshot)
 
         regressions = []
         if ref.history_root and Path(ref.history_root).exists():

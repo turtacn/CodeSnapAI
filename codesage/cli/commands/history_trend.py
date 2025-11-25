@@ -17,7 +17,7 @@ from datetime import datetime
 @click.option('--format', 'output_format', type=click.Choice(['json', 'yaml']), default='json', help="Output format.")
 @click.option('--config-file', help="Path to the codesage config file.")
 @click.pass_context
-def history_trend_command(ctx, project_name, output, output_format, config_file):
+def history_trend(ctx, project_name, output, output_format, config_file):
     audit_logger = ctx.obj.audit_logger
     try:
         if config_file:

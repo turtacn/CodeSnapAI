@@ -18,7 +18,7 @@ from datetime import datetime
 @click.option('--task-id', help="The ID of the task within the governance plan.")
 @click.option('--task', 'task_path', type=click.Path(exists=True), help="Path to a single GovernanceTask YAML/JSON file.")
 @click.pass_context
-def jules_prompt_command(ctx, plan_path: Optional[str], task_id: Optional[str], task_path: Optional[str]):
+def jules_prompt(ctx, plan_path: Optional[str], task_id: Optional[str], task_path: Optional[str]):
     """
     Generates a prompt for Jules from a governance task.
     """

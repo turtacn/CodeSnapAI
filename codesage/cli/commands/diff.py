@@ -25,12 +25,24 @@ def diff(version1, version2, output, format):
     """
     manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
 
-    snapshot1 = manager.load_snapshot(version1)
+    from codesage.snapshot.models import ProjectSnapshot
+    import json
+    from pathlib import Path
+
+    def load_snapshot_from_path_or_version(path_or_version: str):
+        path = Path(path_or_version)
+        if path.is_file() and path.exists():
+            with open(path, 'r') as f:
+                data = json.load(f)
+                return ProjectSnapshot.model_validate(data)
+        return manager.load_snapshot(path_or_version)
+
+    snapshot1 = load_snapshot_from_path_or_version(version1)
     if not snapshot1:
         click.echo(f"Snapshot {version1} not found.", err=True)
         return
 
-    snapshot2 = manager.load_snapshot(version2)
+    snapshot2 = load_snapshot_from_path_or_version(version2)
     if not snapshot2:
         click.echo(f"Snapshot {version2} not found.", err=True)
         return

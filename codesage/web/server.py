@@ -56,7 +56,7 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
             snapshot_dir = Path(config.snapshot_path).parent
 
             # Or use default snapshot dir
-            from codesage.cli.commands.snapshot import SNAPSHOT_DIR, DEFAULT_CONFIG
+            from codesage.config.defaults import SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG
 
             # We try to respect the configured path if it looks like a directory, otherwise default
             if Path(config.snapshot_path).is_dir():
@@ -64,7 +64,7 @@ def create_app(config: WebConsoleConfig) -> "FastAPI":
             else:
                 save_dir = SNAPSHOT_DIR
 
-            manager = SnapshotVersionManager(save_dir, DEFAULT_CONFIG['snapshot'])
+            manager = SnapshotVersionManager(save_dir, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
 
             # SnapshotVersionManager expects a ProjectSnapshot object, so we need to parse the dict
             from codesage.snapshot.models import ProjectSnapshot

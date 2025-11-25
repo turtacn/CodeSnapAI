@@ -116,3 +116,8 @@ dmypy.json
 .pyre/
 /ai/
 /.ai/
+
+# CodeSage files
+.codesage/
+report.md
+report.json

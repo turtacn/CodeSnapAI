@@ -9,12 +9,12 @@ from .commands.diff import diff
 from .commands.config import config
 from .commands.report import report
 from .commands.llm_suggest import llm_suggest
-from .commands.governance_plan import governance_plan_command
-from .commands.jules_prompt import jules_prompt_command
-from .commands.web_console import web_console_command
-from .commands.history_snapshot import history_snapshot_command
-from .commands.history_diff import history_diff_command
-from .commands.history_trend import history_trend_command
+from .commands.governance_plan import governance_plan
+from .commands.jules_prompt import jules_prompt
+from .commands.web_console import web_console
+from .commands.history_snapshot import history_snapshot
+from .commands.history_diff import history_diff
+from .commands.history_trend import history_trend
 from .commands.org_report import org_report
 from .plugin_loader import load_plugins
 
@@ -55,12 +55,12 @@ main.add_command(diff)
 main.add_command(config)
 main.add_command(report)
 main.add_command(llm_suggest)
-main.add_command(governance_plan_command)
-main.add_command(jules_prompt_command)
-main.add_command(web_console_command)
-main.add_command(history_snapshot_command)
-main.add_command(history_diff_command)
-main.add_command(history_trend_command)
+main.add_command(governance_plan)
+main.add_command(jules_prompt)
+main.add_command(web_console)
+main.add_command(history_snapshot)
+main.add_command(history_diff)
+main.add_command(history_trend)
 main.add_command(org_report)
 
 # Load plugin commands

@@ -38,3 +38,14 @@ DEFAULT_CONFIG = {
     "audit": AuditConfig().model_dump(),
     "integrations": IntegrationsConfig().model_dump(),
 }
+
+SNAPSHOT_DIR = ".codesage/snapshots"
+
+DEFAULT_SNAPSHOT_CONFIG = {
+    "snapshot": {
+        "versioning": {
+            "max_versions": 10,
+            "retention_days": 30
+        }
+    }
+}

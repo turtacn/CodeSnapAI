@@ -1,6 +1,7 @@
 import click
 import uvicorn
 from typing import Optional
+from pathlib import Path
 
 from codesage.config.loader import load_config
 from codesage.config.web import WebConsoleConfig
@@ -12,10 +13,12 @@ from datetime import datetime
 @click.command("web-console")
 @click.option("--config", "config_path", help="Path to a custom .codesage.yaml config file.")
 @click.pass_context
-def web_console_command(ctx, config_path: Optional[str]) -> None:
+def web_console(ctx, config_path: Optional[str]) -> None:
     """Launch the CodeSage web console."""
     audit_logger = ctx.obj.audit_logger
     try:
+        if config_path is None:
+            config_path = str(Path.cwd())
         loaded_config = load_config(config_path)
         web_config_dict = loaded_config.get("web", {})
         web_config = WebConsoleConfig.model_validate(web_config_dict)

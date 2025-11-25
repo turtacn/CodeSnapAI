@@ -19,15 +19,7 @@ DEFAULT_EXCLUDE_DIRS = {
     "__pycache__", "node_modules", "vendor", "dist", "build", "target",
 }
 
-DEFAULT_CONFIG = {
-    "snapshot": {
-        "versioning": {
-            "max_versions": 10,
-            "retention_days": 30
-        }
-    }
-}
-SNAPSHOT_DIR = ".codesage/snapshots"
+from codesage.config.defaults import SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG
 
 def get_file_hash(path):
     with open(path, 'rb') as f:
@@ -52,6 +44,56 @@ from codesage.semantic_digest.java_snapshot_builder import JavaSemanticSnapshotB
 
 
 from codesage.audit.models import AuditEvent
+
+
+def _create_snapshot_data(path):
+    file_snapshots = []
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
+        for file in files:
+            file_path = os.path.join(root, file)
+            language = detect_language(file_path)
+
+            if language:
+                parser = create_parser(language)
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    source_code = f.read()
+
+                ast_summary = parser.get_ast_summary(source_code)
+                complexity_metrics = parser.get_complexity_metrics(source_code)
+            else:
+                language = "unknown"
+                ast_summary=ASTSummary(function_count=0, class_count=0, import_count=0, comment_lines=0)
+                complexity_metrics=ComplexityMetrics(cyclomatic=0)
+
+            file_snapshots.append(FileSnapshot(
+                path=file_path,
+                language=language,
+                hash=get_file_hash(file_path),
+                lines=len(open(file_path, encoding='utf-8', errors='ignore').readlines()),
+                ast_summary=ast_summary,
+                complexity_metrics=complexity_metrics,
+            ))
+
+    total_size = sum(os.path.getsize(fs.path) for fs in file_snapshots)
+
+    return ProjectSnapshot(
+        metadata=SnapshotMetadata(
+            version="",
+            timestamp=datetime.now(),
+            project_name=os.path.basename(os.path.abspath(path)),
+            file_count=len(file_snapshots),
+            total_size=total_size,
+            tool_version=tool_version,
+            config_hash="not_implemented",
+            git_commit=None
+        ),
+        files=file_snapshots,
+        global_metrics={},
+        dependency_graph=DependencyGraph(edges=[]),
+        detected_patterns=[],
+        issues=[]
+    )
 
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
@@ -126,66 +168,27 @@ def create(ctx, path, format, output, compress, language):
             click.echo(f"{language.capitalize()} semantic digest created at {output}")
             return
 
-        manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
+        snapshot_data = _create_snapshot_data(path)
 
-        file_snapshots = []
-        for root, dirs, files in os.walk(path):
-            dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
-            for file in files:
-                file_path = os.path.join(root, file)
-                language = detect_language(file_path)
+        if output:
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w') as f:
+                f.write(snapshot_data.model_dump_json(indent=2))
 
-                if language:
-                    parser = create_parser(language)
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        source_code = f.read()
-
-                    ast_summary = parser.get_ast_summary(source_code)
-                    complexity_metrics = parser.get_complexity_metrics(source_code)
-                else:
-                    language = "unknown"
-                    ast_summary=ASTSummary(function_count=0, class_count=0, import_count=0, comment_lines=0)
-                    complexity_metrics=ComplexityMetrics(cyclomatic=0)
-
-                file_snapshots.append(FileSnapshot(
-                    path=file_path,
-                    language=language,
-                    hash=get_file_hash(file_path),
-                    lines=len(open(file_path, encoding='utf-8', errors='ignore').readlines()),
-                    ast_summary=ast_summary,
-                    complexity_metrics=complexity_metrics,
-                ))
-
-        total_size = sum(os.path.getsize(fs.path) for fs in file_snapshots)
-
-        snapshot_data = ProjectSnapshot(
-            metadata=SnapshotMetadata(
-                version="",
-                timestamp=datetime.now(),
-                project_name=os.path.basename(os.path.abspath(path)),
-                file_count=len(file_snapshots),
-                total_size=total_size,
-                tool_version=tool_version,
-                config_hash="not_implemented",
-                git_commit=None
-            ),
-            files=file_snapshots,
-            global_metrics={},
-            dependency_graph=DependencyGraph(edges=[]),
-            detected_patterns=[],
-            issues=[]
-        )
-
-        if compress:
-            snapshot_path = manager.save_snapshot(snapshot_data, format)
-            with open(snapshot_path, 'rb') as f_in:
-                with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
-                    f_out.writelines(f_in)
-            os.remove(snapshot_path)
-            click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
+            click.echo(f"Snapshot created at {output}")
         else:
-            snapshot_path = manager.save_snapshot(snapshot_data, format)
-            click.echo(f"Snapshot created at {snapshot_path}")
+            manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+            if compress:
+                snapshot_path = manager.save_snapshot(snapshot_data, format)
+                with open(snapshot_path, 'rb') as f_in:
+                    with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
+                        f_out.writelines(f_in)
+                os.remove(snapshot_path)
+                click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
+            else:
+                snapshot_path = manager.save_snapshot(snapshot_data, format)
+                click.echo(f"Snapshot created at {snapshot_path}")
     finally:
         audit_logger.log(
             AuditEvent(
@@ -206,7 +209,7 @@ def create(ctx, path, format, output, compress, language):
 @snapshot.command('list')
 def list_snapshots():
     """List all available snapshots."""
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
     snapshots = manager.list_snapshots()
     if not snapshots:
         click.echo("No snapshots found.")
@@ -218,7 +221,7 @@ def list_snapshots():
 @click.argument('version')
 def show(version):
     """Show details of a specific snapshot."""
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
     snapshot_data = manager.load_snapshot(version)
     if not snapshot_data:
         click.echo(f"Snapshot {version} not found.", err=True)
@@ -231,7 +234,7 @@ def cleanup(dry_run):
     """Clean up old snapshots."""
     from datetime import timedelta
 
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
 
     if dry_run:
         index = manager._load_index()
