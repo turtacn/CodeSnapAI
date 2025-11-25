@@ -28,7 +28,7 @@ from datetime import datetime
 @click.option("--group-by", type=click.Choice(["rule", "file", "risk_level"]), help="Override the grouping strategy.")
 @click.option("--max-tasks-per-file", type=int, help="Override the max tasks per file limit.")
 @click.pass_context
-def governance_plan_command(
+def governance_plan(
     ctx,
     input_path: str,
     output_path: str,
@@ -84,4 +84,4 @@ def governance_plan_command(
 
 def register(cli: click.Group) -> None:
     """Registers the governance-plan command with the main CLI group."""
-    cli.add_command(governance_plan_command)
+    cli.add_command(governance_plan)

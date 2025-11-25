@@ -19,7 +19,7 @@ from datetime import datetime
 @click.option('--output', type=click.Path(dir_okay=False, writable=True), help="Path to save the diff output YAML file.")
 @click.option('--config-file', help="Path to the codesage config file.")
 @click.pass_context
-def history_diff_command(ctx, project_name, from_id, to_id, output, config_file):
+def history_diff(ctx, project_name, from_id, to_id, output, config_file):
     audit_logger = ctx.obj.audit_logger
     try:
         if config_file:

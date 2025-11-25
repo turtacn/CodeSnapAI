@@ -19,7 +19,7 @@ from codesage.audit.models import AuditEvent
 @click.option('--trigger', default='manual', help="The trigger for the snapshot (e.g., 'ci', 'manual').")
 @click.option('--config-file', help="Path to the codesage config file.")
 @click.pass_context
-def history_snapshot_command(ctx, snapshot_path, project_name, commit, branch, trigger, config_file):
+def history_snapshot(ctx, snapshot_path, project_name, commit, branch, trigger, config_file):
     audit_logger = ctx.obj.audit_logger
     try:
         if config_file:
