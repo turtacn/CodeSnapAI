@@ -1,0 +1,22 @@
+func Main() {
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+  line
+}

@@ -1,0 +1,51 @@
+You are a code refactoring expert. The following function has excessive complexity:
+
+**Problem**:
+- Complexity Score: {{ issue.metrics.complexity }}
+- Threshold: {{ rules.max_complexity | default(10) }}
+- Issue: {{ issue.message }}
+
+**Current Code**:
+```{{ language }}
+{{ code.function_code }}
+```
+
+**Dependencies**:
+
+```{{ language }}
+{{ code.dependencies | join('\n') }}
+```
+
+**Refactoring Guidelines**:
+
+1. Extract complex logic into separate functions
+2. Each function should have a single responsibility
+3. Maintain the original function signature: `{{ code.function_signature }}`
+4. Add docstrings to new functions
+5. Preserve all existing functionality
+
+{% if examples %}
+**Example Refactoring**:
+Before:
+
+```{{ language }}
+{{ examples[0].before }}
+```
+
+After:
+
+```{{ language }}
+{{ examples[0].after }}
+```
+
+{% endif %}
+
+**Output Requirements**:
+
+* Return ONLY the refactored code in a single code block
+* Include brief comments explaining the decomposition
+* Ensure all extracted functions are placed BEFORE the main function
+
+```{{ language }}
+<your_refactored_code_here>
+```

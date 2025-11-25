@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON
 from sqlalchemy.orm import relationship, declarative_base
@@ -58,9 +58,14 @@ class Dependency(Base):
     snapshot = relationship("Snapshot", back_populates="dependencies")
 
 
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Union
 from codesage.snapshot.models import SnapshotMetadata, ProjectSnapshot
+
+class SnapshotMeta(BaseModel):
+    snapshot_id: str
+    created_at: Union[str, datetime] = Field(default_factory=datetime.utcnow) # Allow datetime for Pydantic conversion
+    project_name: Optional[str] = None # Added to match usage in tests
 
 class SnapshotIndex(BaseModel):
     """
@@ -69,12 +74,13 @@ class SnapshotIndex(BaseModel):
     """
     version: str = "1.0"
     project_name: str
-    items: List[SnapshotMetadata] = []
-
-class SnapshotMeta(BaseModel):
-    snapshot_id: str
-    created_at: str
+    items: List[SnapshotMeta] = [] # Updated to use SnapshotMeta which is what's stored in index.yaml tests
 
 class HistoricalSnapshot(BaseModel):
-    metadata: SnapshotMetadata
+    meta: SnapshotMeta
     snapshot: ProjectSnapshot
+
+    # Alias for backward compatibility if metadata was used
+    @property
+    def metadata(self):
+        return self.snapshot.metadata

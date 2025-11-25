@@ -3,6 +3,7 @@
 """
 import asyncio
 import logging
+import time
 from typing import List, Dict, Optional, Set
 from dataclasses import dataclass, field
 from enum import Enum
@@ -11,6 +12,9 @@ from queue import PriorityQueue
 
 from codesage.history.models import Issue
 from codesage.governance.patch_manager import Patch, PatchManager
+from codesage.jules.bridge import JulesBridge, ValidationError
+# FixSuggestion is internal to JulesBridge use mostly, but good for type check
+from codesage.models.issue import FixSuggestion
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -32,6 +36,14 @@ class FailureReason(Enum):
     UNKNOWN = "unknown"
 
 @dataclass
+class ExecutionResult:
+    """Task execution result including Jules details"""
+    status: str
+    jules_task_id: Optional[str] = None
+    iterations: int = 0
+    error: Optional[str] = None
+
+@dataclass
 class FixTask:
     """修复任务（增强版）"""
     id: str
@@ -43,6 +55,7 @@ class FixTask:
     retry_count: int = 0
     max_retries: int = 3
     validation_config: Dict = field(default_factory=dict)
+    code_context: Dict[str, str] = field(default_factory=dict)
 
     @property
     def file_path(self) -> str:
@@ -92,12 +105,14 @@ class GovernanceOrchestrator:
         patch_manager: PatchManager,
         max_parallel: int = 3,
         retry_strategy: str = "exponential_backoff",
-        failure_analyzer: Optional[FailureAnalyzer] = None
+        failure_analyzer: Optional[FailureAnalyzer] = None,
+        jules_bridge: Optional[JulesBridge] = None
     ):
         self.patch_manager = patch_manager
         self.max_parallel = max_parallel
         self.retry_strategy = retry_strategy
         self.failure_analyzer = failure_analyzer or FailureAnalyzer()
+        self.jules = jules_bridge
 
         # 任务依赖图（使用 NetworkX）
         self.task_graph = nx.DiGraph()
@@ -213,6 +228,54 @@ class GovernanceOrchestrator:
 
         return dict(results_list)
 
+    def execute_fix_with_jules(self, task: FixTask) -> ExecutionResult:
+        """使用 Jules 执行修复（带验证）"""
+        if not self.jules:
+             return ExecutionResult(status="FAILED", error="Jules not configured")
+
+        # 1. 提交修复请求
+        try:
+            task_id = self.jules.submit_fix_request(task.issue, task.code_context)
+
+            # 2. 轮询结果 (Blocking call inside executor is fine)
+            fix_suggestion = None
+            start_time = time.time()
+            while not fix_suggestion:
+                if time.time() - start_time > 300: # 5 minutes max wait
+                     return ExecutionResult(status="FAILED", error="Jules timeout")
+
+                fix_suggestion = self.jules.get_fix_result(task_id)
+                if not fix_suggestion:
+                    time.sleep(2) # Polling interval
+
+            # 3. 验证与迭代
+            validated_fix = self.jules.verify_and_iterate(
+                fix_suggestion,
+                task.issue,
+                max_iterations=3
+            )
+
+            # 4. 应用补丁
+            patch_result = self.patch_manager.apply_patch(
+                task.issue.file_path,
+                validated_fix.new_code,
+                validated_fix.patch_context
+            )
+
+            # 5. 记录反馈 (Placeholder)
+            # self._record_jules_feedback(task, validated_fix, patch_result)
+
+            return ExecutionResult(
+                status="SUCCESS" if patch_result.success else "FAILED",
+                jules_task_id=task_id,
+                iterations=validated_fix.iterations,
+                error=patch_result.error if not patch_result.success else None
+            )
+
+        except Exception as e:
+            logger.error(f"Jules execution failed: {e}")
+            return ExecutionResult(status="FAILED", error=str(e))
+
     async def _execute_single_task(self, task_id: str) -> TaskStatus:
         """执行单个任务（带重试）"""
         task = self.tasks[task_id]
@@ -247,8 +310,27 @@ class GovernanceOrchestrator:
                     elif reason == FailureReason.CONTEXTUAL:
                         # 上下文问题 → 请求 Jules 重新生成
                         logger.warning(f"Task {task_id} needs Jules re-generation")
-                        task.status = TaskStatus.PENDING_REGENERATION
-                        return TaskStatus.PENDING_REGENERATION
+
+                        if self.jules:
+                            logger.info(f"Delegating regeneration to Jules for task {task_id}")
+                            exec_result = await loop.run_in_executor(None, self.execute_fix_with_jules, task)
+                            if exec_result.status == "SUCCESS":
+                                task.status = TaskStatus.SUCCESS
+                                return TaskStatus.SUCCESS
+                            else:
+                                logger.error(f"Jules regeneration failed: {exec_result.error}")
+                                # Count as retry
+                                task.retry_count += 1
+                                if task.retry_count <= task.max_retries:
+                                    task.status = TaskStatus.RETRYING
+                                    await self._apply_retry_backoff(task)
+                                    continue # Retry logic
+                                else:
+                                    task.status = TaskStatus.FAILED
+                                    return TaskStatus.FAILED
+                        else:
+                            task.status = TaskStatus.PENDING_REGENERATION
+                            return TaskStatus.PENDING_REGENERATION
 
                     elif reason == FailureReason.VALIDATION:
                         # 验证失败 → 人工介入

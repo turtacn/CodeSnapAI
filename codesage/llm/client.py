@@ -22,6 +22,10 @@ class LLMResponse(BaseModel):
     usage: Dict[str, int] = Field(default_factory=dict)
     raw_output: Optional[str] = None
 
+    # Optional fields for enhanced responses or structured output parsing
+    fix_hint: Optional[str] = None
+    rationale: Optional[str] = None
+
 
 class BaseLLMClient(ABC):
     """Abstract base class for LLM clients."""
@@ -38,4 +42,6 @@ class DummyLLMClient(BaseLLMClient):
             content="```python\n# Dummy fix\ndef fixed_function():\n    pass\n```",
             usage={"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20},
             raw_output="Dummy output",
+            fix_hint="Refactor this function to improve readability.",
+            rationale="The function is too complex."
         )

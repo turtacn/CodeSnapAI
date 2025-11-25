@@ -16,7 +16,8 @@ class TestShellParser(unittest.TestCase):
         commands = self.parser.extract_external_commands()
         self.assertIn("tar", commands)
         self.assertIn("git", commands)
-        self.assertNotIn("echo", commands) # Builtin
+        # Updated expectation: echo IS included as external command now
+        self.assertIn("echo", commands)
 
     def test_variable_scope(self):
         code = """

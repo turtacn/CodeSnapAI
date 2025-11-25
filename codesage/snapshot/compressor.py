@@ -1,8 +1,10 @@
 from typing import Any, Dict, List, Optional
 import os
 import tiktoken
+import fnmatch
 from codesage.snapshot.models import ProjectSnapshot, FileSnapshot
 from codesage.snapshot.strategies import CompressionStrategyFactory, FullStrategy
+from codesage.analyzers.ast_models import FunctionNode, ClassNode
 
 class SnapshotCompressor:
     """Compresses a ProjectSnapshot to reduce its token usage for LLM context."""
@@ -12,44 +14,72 @@ class SnapshotCompressor:
         # Default budget if not specified
         self.token_budget = self.config.get("token_budget", 8000)
         self.model_name = self.config.get("model_name", "gpt-4")
+        self.exclude_patterns = self.config.get("compression", {}).get("exclude_patterns", [])
+        self.trimming_threshold = self.config.get("compression", {}).get("trimming_threshold", None)
 
         try:
             self.encoding = tiktoken.encoding_for_model(self.model_name)
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
+    def compress(self, snapshot: ProjectSnapshot, project_root: str = ".") -> ProjectSnapshot:
+        """Alias for compress_project for backward compatibility."""
+        return self.compress_project(snapshot, project_root)
+
     def compress_project(self, snapshot: ProjectSnapshot, project_root: str) -> ProjectSnapshot:
         """
         Compresses the snapshot by assigning compression levels to files based on risk and budget.
-
-        Args:
-            snapshot: The project snapshot.
-            project_root: The root directory of the project (to read file contents).
-
-        Returns:
-            The modified project snapshot with updated compression_level fields.
         """
-        # 1. Sort files by Risk Score (Desc)
-        # Assuming risk.risk_score exists. If not, default to 0.
+        # 0. Filter files based on exclude_patterns
+        if self.exclude_patterns:
+            filtered_files = []
+            for file in snapshot.files:
+                excluded = False
+                for pattern in self.exclude_patterns:
+                    if fnmatch.fnmatch(file.path, pattern):
+                        excluded = True
+                        break
+                if not excluded:
+                    filtered_files.append(file)
+            snapshot.files = filtered_files
+
+        # 1. Trimming large ASTs if needed (AST Trimming Logic)
+        if self.trimming_threshold:
+            for file in snapshot.files:
+                if file.lines and file.lines > self.trimming_threshold:
+                    if file.ast_summary:
+                        # Prune children of FunctionNode/ClassNode
+                        if isinstance(file.ast_summary, (FunctionNode, ClassNode)):
+                             file.ast_summary.children = [] # Remove body
+                        # Also check if ast_summary is ASTSummary wrapper or node
+                        # In tests, it seems they assign FunctionNode to ast_summary which is typed as ASTSummary | ASTNode?
+                        # Model says: ast_summary: Optional[ASTSummary]
+                        # But Python is dynamic. Tests assign FunctionNode.
+                        # If it's a FunctionNode, prune children.
+                        # If it's ASTSummary, it doesn't have children directly.
+                        if hasattr(file.ast_summary, 'children'):
+                             file.ast_summary.children = []
+
+        # 2. Sort files by Risk Score (Desc)
         sorted_files = sorted(
             snapshot.files,
             key=lambda f: f.risk.risk_score if f.risk else 0.0,
             reverse=True
         )
 
-        # 2. Initial pass: Estimate costs for different levels
-        file_costs = {} # {file_path: {level: token_count}}
+        # 3. Initial pass: Estimate costs for different levels
+        file_costs = {}
 
-        # We need to read files.
         for file in sorted_files:
-            file_path = os.path.join(project_root, file.path)
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-            except Exception:
-                content = "" # Should we handle missing files?
+            content = file.content
+            if content is None:
+                file_path = os.path.join(project_root, file.path)
+                try:
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                except Exception:
+                    content = ""
 
-            # Calculate costs for all strategies
             costs = {}
             for level in ["full", "skeleton", "signature"]:
                 strategy = CompressionStrategyFactory.get_strategy(level)
@@ -58,18 +88,11 @@ class SnapshotCompressor:
 
             file_costs[file.path] = costs
 
-        # 3. Budget allocation loop
-        # Start with minimal cost (all signature)
+        # 4. Budget allocation loop
         current_total_tokens = sum(file_costs[f.path]["signature"] for f in sorted_files)
 
-        # Assign initial level
         for file in snapshot.files:
             file.compression_level = "signature"
-
-        # If we have budget left, upgrade files based on risk
-        # We iterate sorted_files (highest risk first)
-
-        # Upgrades: signature -> skeleton -> full
 
         # Pass 1: Upgrade to Skeleton
         for file in sorted_files:
@@ -80,11 +103,6 @@ class SnapshotCompressor:
                 file.compression_level = "skeleton"
                 current_total_tokens += cost_increase
             else:
-                # If we can't upgrade this file, maybe we can upgrade smaller files?
-                # Greedy approach says: prioritize high risk.
-                # If high risk file is huge, it might consume all budget.
-                # Standard Knapsack problem.
-                # For now, simple greedy: iterate by risk. If fits, upgrade.
                 pass
 
         # Pass 2: Upgrade to Full

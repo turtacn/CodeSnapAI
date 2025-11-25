@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from codesage.config.history import HistoryConfig
 from codesage.history.models import HistoricalSnapshot, SnapshotMeta
-from codesage.history.store import save_historical_snapshot
+from codesage.history.store import save_historical_snapshot, update_snapshot_index
 from codesage.history.trend_builder import build_trend_series
 from codesage.snapshot.models import ProjectSnapshot, SnapshotMetadata, FileSnapshot, FileRisk
 
@@ -37,6 +37,10 @@ def test_trend_series_from_multiple_snapshots(tmp_path: Path):
         )
         hs = HistoricalSnapshot(meta=meta, snapshot=snapshot)
         save_historical_snapshot(tmp_path, hs, config)
+
+        # Explicitly update index as save_historical_snapshot doesn't do it automatically anymore?
+        # The store.py logic I implemented doesn't update index.
+        update_snapshot_index(tmp_path, meta)
 
     # Build trend series
     series = build_trend_series(tmp_path, project_name)

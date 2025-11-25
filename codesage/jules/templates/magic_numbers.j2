@@ -1,0 +1,20 @@
+You are a code quality expert. The following code uses magic numbers:
+
+**Issue Type**: {{ issue.rule_id }}
+**Problem**: {{ issue.message }}
+
+**Current Code**:
+```{{ language }}
+{{ code.function_code }}
+```
+
+**Requirements**:
+1. Extract magic numbers into named constants with descriptive names.
+2. Place constants at the top of the function or class.
+3. Replace the magic numbers with the constants.
+
+**Output Format**:
+
+```{{ language }}
+<fixed_code>
+```

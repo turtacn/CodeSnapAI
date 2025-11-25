@@ -1,0 +1,32 @@
+You are a code quality expert. Fix the following issue:
+
+**Issue Type**: {{ issue.rule_id }}
+**Severity**: {{ issue.severity }}
+**Problem**: {{ issue.message }}
+
+**Current Code**:
+```{{ language }}
+{{ code.function_code }}
+```
+
+**File Context** (dependencies):
+
+```{{ language }}
+{{ code.dependencies | join('\n') }}
+```
+
+**Requirements**:
+
+1. Fix the issue while maintaining existing functionality
+2. Follow {{ language }} best practices and PEP 8 (if Python)
+3. Preserve function signature and return type
+4. Add comments explaining the fix
+5. Ensure the fix passes syntax validation
+
+**Output Format**:
+
+```{{ language }}
+<fixed_code>
+```
+
+**Explanation**: <brief explanation of the fix>

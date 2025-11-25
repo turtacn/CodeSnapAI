@@ -6,7 +6,7 @@ import yaml
 from codesage.config.loader import load_config
 from codesage.config.history import HistoryConfig
 from codesage.history.models import HistoricalSnapshot, SnapshotMeta
-from codesage.history.store import save_historical_snapshot
+from codesage.history.store import save_historical_snapshot, update_snapshot_index
 from codesage.snapshot.models import ProjectSnapshot
 
 from codesage.audit.models import AuditEvent
@@ -40,16 +40,22 @@ def history_snapshot_command(ctx, snapshot_path, project_name, commit, branch, t
         meta = SnapshotMeta(
             project_name=project_name,
             snapshot_id=snapshot_id,
-            commit=commit,
-            branch=branch,
-            trigger=trigger,
+            # commit=commit, # SnapshotMeta in models.py doesn't have commit/branch/trigger in my recent update or memory?
+            # Let's check model definition.
+            # SnapshotMeta(snapshot_id, created_at, project_name)
+            created_at=datetime.utcnow()
         )
 
         hs = HistoricalSnapshot(meta=meta, snapshot=project_snapshot)
 
         save_historical_snapshot(history_root, hs, history_config)
+        update_snapshot_index(history_root, meta, max_snapshots=history_config.max_snapshots)
 
         click.echo(f"Successfully saved snapshot with id '{snapshot_id}' for project '{project_name}'.")
+    except Exception as e:
+        # Log the exception details for debugging tests
+        click.echo(f"Error: {e}")
+        raise e
     finally:
         audit_logger.log(
             AuditEvent(

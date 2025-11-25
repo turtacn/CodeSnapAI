@@ -1,0 +1,21 @@
+You are a code quality expert. The following code has empty exception handlers:
+
+**Issue Type**: {{ issue.rule_id }}
+**Severity**: {{ issue.severity }}
+**Problem**: {{ issue.message }}
+
+**Current Code**:
+```{{ language }}
+{{ code.function_code }}
+```
+
+**Requirements**:
+1. Add proper error logging using `logging` module or equivalent.
+2. If applicable, re-raise the exception or handle it gracefully.
+3. Do not just `pass` silently unless explicitly justified.
+
+**Output Format**:
+
+```{{ language }}
+<fixed_code>
+```

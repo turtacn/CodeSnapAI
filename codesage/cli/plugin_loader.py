@@ -74,8 +74,31 @@ class PluginManager:
         self.analyzers.append(analyzer)
         logger.debug(f"Registered analyzer: {analyzer.id}")
 
-def load_plugins(cli_group):
-    # This function is used by main.py to load extra commands from plugins.
-    # It seems to be a different usage than PluginManager.load_plugins.
-    # We will simulate scanning for CLI extensions.
-    pass
+def load_plugins(cli_group, plugins_dir=None):
+    """
+    Loads CLI plugins.
+    Supports plugins_dir argument for compatibility with tests.
+    """
+    if not plugins_dir:
+        # Default location or from config
+        plugins_dir = os.path.expanduser("~/.codesage/plugins")
+
+    plugins_path = Path(plugins_dir)
+    if not plugins_path.exists():
+        return
+
+    sys.path.insert(0, str(plugins_path))
+    for plugin_file in plugins_path.glob("*.py"):
+        if plugin_file.name.startswith("__"): continue
+
+        try:
+            module_name = plugin_file.stem
+            spec = importlib.util.spec_from_file_location(module_name, plugin_file)
+            if not spec or not spec.loader: continue
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            if hasattr(module, "register_command"):
+                module.register_command(cli_group)
+        except Exception as e:
+            logger.warning(f"Failed to load CLI plugin {plugin_file}: {e}")
