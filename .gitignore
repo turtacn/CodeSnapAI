@@ -114,5 +114,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# CodeSage files
+.codesage/
+test_project/
+report.md
+diff_report.md
+report.json
+report.xml
+semantic_digest.yaml
 /ai/
 /.ai/

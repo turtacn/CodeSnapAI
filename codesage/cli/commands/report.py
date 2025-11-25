@@ -14,8 +14,33 @@ from codesage.ci.policy import evaluate_ci_policy
 from codesage.audit.models import AuditEvent
 from datetime import datetime
 
+import os
+from codesage.snapshot.versioning import SnapshotVersionManager
+
+# This would be loaded from the config file
+# For now, we'll use a default config.
+DEFAULT_CONFIG = {
+    "snapshot": {
+        "versioning": {
+            "max_versions": 10,
+            "retention_days": 30
+        }
+    }
+}
+SNAPSHOT_DIR = ".codesage/snapshots"
+
+def find_project_root(path):
+    current = os.path.abspath(path)
+    while True:
+        if ".codesage" in os.listdir(current):
+            return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
 @click.command('report', help='Generate reports from a project snapshot.')
-@click.option('--input', 'input_path', required=True, type=click.Path(exists=True), help='Path to the snapshot YAML file.')
+@click.option('--input', 'input_path', required=True, type=click.Path(exists=True), help='Path to the snapshot YAML file or project directory.')
 @click.option('--out-json', 'out_json_path', type=click.Path(), help='Path to save the JSON report.')
 @click.option('--out-md', 'out_md_path', type=click.Path(), help='Path to save the Markdown report.')
 @click.option('--out-junit', 'out_junit_path', type=click.Path(), help='Path to save the JUnit XML report.')
@@ -25,7 +50,23 @@ def report(ctx, input_path: str, out_json_path: Optional[str], out_md_path: Opti
     audit_logger = ctx.obj.audit_logger
     project_name = None
     try:
-        with open(input_path, 'r') as f:
+        if os.path.isdir(input_path):
+            project_root = find_project_root(input_path)
+            if not project_root:
+                click.echo("Could not find a .codesage directory in the project.", err=True)
+                return
+            snapshot_dir = os.path.join(project_root, SNAPSHOT_DIR)
+            manager = SnapshotVersionManager(snapshot_dir, DEFAULT_CONFIG['snapshot'])
+            snapshots = manager.list_snapshots()
+            if not snapshots:
+                click.echo("No snapshots found for this project. Please create a snapshot first using 'codesage snapshot create'.", err=True)
+                return
+            latest_snapshot = sorted(snapshots, key=lambda s: s['timestamp'], reverse=True)[0]
+            snapshot_file = latest_snapshot['path']
+        else:
+            snapshot_file = input_path
+
+        with open(snapshot_file, 'r') as f:
             snapshot_data = yaml.safe_load(f)
 
         snapshot = ProjectSnapshot.model_validate(snapshot_data)

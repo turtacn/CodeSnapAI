@@ -13,7 +13,7 @@ def test_analyze_single_file(tmp_path):
     assert result.exit_code == 0
     assert "File:" in result.output
     assert "test.py" in result.output
-    assert "Functions: ['hello']" in result.output
+    assert "Functions: 1" in result.output
 
 def test_analyze_directory(tmp_path):
     """Test analyzing a directory."""

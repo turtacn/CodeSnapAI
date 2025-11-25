@@ -85,10 +85,22 @@ class SnapshotVersionManager:
         index = self._load_index()
         now = datetime.now(timezone.utc)
 
-        valid_snapshots = [
-            s for s in index
-            if now - datetime.fromisoformat(s["timestamp"]) <= timedelta(days=self.retention_days)
-        ]
+        now = datetime.now(timezone.utc)
+        valid_snapshots = []
+        for s in index:
+            timestamp_str = s["timestamp"]
+            try:
+                # Attempt to parse as timezone-aware datetime
+                timestamp = datetime.fromisoformat(timestamp_str)
+                if timestamp.tzinfo is None:
+                    # If naive, assume local timezone and convert to UTC
+                    timestamp = timestamp.astimezone(timezone.utc)
+            except ValueError:
+                # Fallback for older/invalid formats
+                continue
+
+            if now - timestamp <= timedelta(days=self.retention_days):
+                valid_snapshots.append(s)
 
         if len(valid_snapshots) > self.max_versions:
             valid_snapshots = sorted(

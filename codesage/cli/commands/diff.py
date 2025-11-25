@@ -39,15 +39,45 @@ def diff(version1, version2, output, format):
     diff_data = differ.diff(snapshot1, snapshot2)
 
     if output:
-        # TODO: Implement file output
-        click.echo(f"Diff report will be saved to {output} in {format} format.")
+        if format == 'json':
+            with open(output, 'w') as f:
+                f.write(diff_data.model_dump_json(indent=2))
+        elif format == 'markdown':
+            with open(output, 'w') as f:
+                f.write(f"# Snapshot Diff: {version1} vs {version2}\n\n")
+                f.write(f"## Summary\n\n")
+                f.write(f"- **Added files:** {len(diff_data.added_files)}\n")
+                f.write(f"- **Removed files:** {len(diff_data.removed_files)}\n")
+                f.write(f"- **Modified files:** {len(diff_data.modified_files)}\n")
+                f.write(f"- **Added dependencies:** {len(diff_data.dependency_changes.added_edges)}\n")
+                f.write(f"- **Removed dependencies:** {len(diff_data.dependency_changes.removed_edges)}\n\n")
 
-    click.echo(f"Comparing {version1} and {version2}:")
-    click.echo(f"  Added files: {len(diff_data.added_files)}")
-    click.echo(f"  Removed files: {len(diff_data.removed_files)}")
-    click.echo(f"  Modified files: {len(diff_data.modified_files)}")
-    click.echo(f"  Added dependencies: {len(diff_data.dependency_changes.added_edges)}")
-    click.echo(f"  Removed dependencies: {len(diff_data.dependency_changes.removed_edges)}")
+                if diff_data.added_files:
+                    f.write("## Added Files\n\n")
+                    for file in diff_data.added_files:
+                        f.write(f"- `{file.path}`\n")
+                    f.write("\n")
+
+                if diff_data.removed_files:
+                    f.write("## Removed Files\n\n")
+                    for file in diff_data.removed_files:
+                        f.write(f"- `{file.path}`\n")
+                    f.write("\n")
+
+                if diff_data.modified_files:
+                    f.write("## Modified Files\n\n")
+                    for file in diff_data.modified_files:
+                        f.write(f"- `{file.path}`\n")
+                    f.write("\n")
+
+        click.echo(f"Diff report saved to {output}")
+    else:
+        click.echo(f"Comparing {version1} and {version2}:")
+        click.echo(f"  Added files: {len(diff_data.added_files)}")
+        click.echo(f"  Removed files: {len(diff_data.removed_files)}")
+        click.echo(f"  Modified files: {len(diff_data.modified_files)}")
+        click.echo(f"  Added dependencies: {len(diff_data.dependency_changes.added_edges)}")
+        click.echo(f"  Removed dependencies: {len(diff_data.dependency_changes.removed_edges)}")
 
 
 if __name__ == '__main__':

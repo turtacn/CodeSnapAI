@@ -75,13 +75,16 @@ def analyze(path, language, exclude, output, format, no_progress):
             click.echo(f"Warning: Skipping file {file_path} due to syntax errors.", err=True)
             continue
 
-        functions = parser.extract_functions()
         imports = parser.extract_imports()
+        ast_summary = parser.get_ast_summary(source_code)
+        complexity_metrics = parser.get_complexity_metrics(source_code)
 
         file_result = {
             "file_path": file_path,
+            "lines": len(source_code.splitlines()),
+            "complexity": complexity_metrics.cyclomatic,
             "imports": [i.path for i in imports],
-            "functions": [f.name for f in functions],
+            "functions": ast_summary.function_count,
         }
         analysis_results.append(file_result)
 
@@ -96,19 +99,21 @@ def analyze(path, language, exclude, output, format, no_progress):
             with open(output, 'w') as f:
                 for result in analysis_results:
                     f.write(f"## {result['file_path']}\n\n")
+                    f.write(f"- **Lines of code:** {result['lines']}\n")
+                    f.write(f"- **Cyclomatic complexity:** {result['complexity']}\n")
+                    f.write(f"- **Functions:** {result['functions']}\n\n")
                     f.write("### Imports\n\n")
                     for imp in result['imports']:
                         f.write(f"- `{imp}`\n")
-                    f.write("\n### Functions\n\n")
-                    for func in result['functions']:
-                        f.write(f"- `{func}`\n")
                     f.write("\n")
         click.echo(f"Analysis results saved to {output}")
     else:
         for result in analysis_results:
             click.echo(f"File: {result['file_path']}")
-            click.echo(f"  Imports: {result['imports']}")
+            click.echo(f"  Lines: {result['lines']}")
+            click.echo(f"  Complexity: {result['complexity']}")
             click.echo(f"  Functions: {result['functions']}")
+            click.echo(f"  Imports: {result['imports']}")
 
 if __name__ == '__main__':
     analyze()
