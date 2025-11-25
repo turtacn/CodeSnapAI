@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -59,7 +59,7 @@ class AuditLogger:
                 self._log_dir.mkdir(parents=True, exist_ok=True)
                 self._log_dir_created = True
 
-            ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
             self._current_file = self._log_dir / f"audit_{ts}.log"
             self._current_file.touch()
             self._current_size = 0
