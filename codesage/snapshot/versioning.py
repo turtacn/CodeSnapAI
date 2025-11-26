@@ -10,9 +10,11 @@ from codesage.snapshot.json_generator import JSONGenerator
 class SnapshotVersionManager:
     """Manages the versioning and lifecycle of project snapshots."""
 
-    def __init__(self, snapshot_dir: str, config: Dict[str, Any]):
-        self.snapshot_dir = snapshot_dir
-        self.index_file = os.path.join(snapshot_dir, "index.json")
+    def __init__(self, snapshot_dir: str, project_name: str, config: Dict[str, Any]):
+        self.base_snapshot_dir = snapshot_dir
+        self.project_name = project_name
+        self.snapshot_dir = os.path.join(self.base_snapshot_dir, self.project_name)
+        self.index_file = os.path.join(self.snapshot_dir, "index.json")
         versioning_config = config.get("versioning", {})
         self.max_versions = versioning_config.get("max_versions", 10)
         self.retention_days = versioning_config.get("retention_days", 30)
@@ -80,11 +82,8 @@ class SnapshotVersionManager:
         )
         self._save_index(index)
 
-    def cleanup_expired_snapshots(self):
-        """Removes expired snapshots based on retention days and max versions."""
-        index = self._load_index()
-        now = datetime.now(timezone.utc)
-
+    def _get_expired_snapshots(self, index: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
+        """Identifies expired snapshots."""
         valid_snapshots = []
         for s in index:
             try:
@@ -102,7 +101,23 @@ class SnapshotVersionManager:
                 valid_snapshots, key=lambda s: s["timestamp"], reverse=True
             )[:self.max_versions]
 
-        expired_snapshots = [s for s in index if s not in valid_snapshots]
+        valid_versions = {s["version"] for s in valid_snapshots}
+        return [s for s in index if s["version"] not in valid_versions]
+
+    def cleanup_expired_snapshots(self):
+        """Removes expired snapshots based on retention days and max versions."""
+        index = self._load_index()
+        if not index:
+            return
+
+        now = datetime.now(timezone.utc)
+        expired_snapshots = self._get_expired_snapshots(index, now)
+
+        if not expired_snapshots:
+            return
+
+        expired_versions = {s["version"] for s in expired_snapshots}
+        valid_snapshots = [s for s in index if s["version"] not in expired_versions]
 
         for snapshot_data in expired_snapshots:
             if os.path.exists(snapshot_data["path"]):

@@ -17,13 +17,14 @@ SNAPSHOT_DIR = ".codesage/snapshots"
 @click.command()
 @click.argument('version1')
 @click.argument('version2')
+@click.option('--project', '-p', required=True, help='The name of the project.')
 @click.option('--output', '-o', type=click.Path(), help='Output file for the diff report.')
 @click.option('--format', '-f', type=click.Choice(['json', 'markdown']), default='json', help='Output format.')
-def diff(version1, version2, output, format):
+def diff(version1, version2, project, output, format):
     """
     Compare two snapshots and show the differences.
     """
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_CONFIG['snapshot'])
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, project, DEFAULT_CONFIG['snapshot'])
 
     from codesage.snapshot.models import ProjectSnapshot
     import json
