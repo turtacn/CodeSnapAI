@@ -121,3 +121,7 @@ dmypy.json
 .codesage/
 report.md
 report.json
+codesage.db
+plan.yml
+task.yml
+enriched_snapshot.yml

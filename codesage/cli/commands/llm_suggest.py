@@ -8,18 +8,23 @@ from codesage.config.llm import LLMConfig
 from codesage.snapshot.yaml_generator import YAMLGenerator
 
 
+from codesage.snapshot.versioning import SnapshotVersionManager
+from codesage.config.defaults import SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG
+
 @click.command('llm-suggest')
-@click.option('--input', '-i', 'input_path', type=click.Path(exists=True, dir_okay=False), required=True, help='Input snapshot YAML file.')
+@click.option('--snapshot-version', '-s', 'snapshot_version', type=str, required=True, help='The version of the snapshot to use.')
+@click.option('--project', '-p', 'project_name', type=str, required=True, help='The name of the project.')
 @click.option('--output', '-o', 'output_path', type=click.Path(), required=True, help='Output snapshot YAML file.')
 @click.option('--provider', type=click.Choice(['dummy']), default='dummy', help='LLM provider to use.')
 @click.option('--model', type=str, default='dummy-model', help='LLM model to use.')
-def llm_suggest(input_path, output_path, provider, model):
+def llm_suggest(snapshot_version, project_name, output_path, provider, model):
     """Enrich a snapshot with LLM-powered suggestions."""
 
-    with open(input_path, 'r') as f:
-        snapshot_data = yaml.safe_load(f)
-
-    project_snapshot = ProjectSnapshot.model_validate(snapshot_data)
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, project_name, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+    project_snapshot = manager.load_snapshot(snapshot_version)
+    if not project_snapshot:
+        click.echo(f"Snapshot {snapshot_version} not found for project '{project_name}'.", err=True)
+        return
 
     if provider == 'dummy':
         llm_client = DummyLLMClient()

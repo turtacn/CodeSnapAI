@@ -10,13 +10,21 @@ from codesage.utils.file_utils import read_yaml_file, write_yaml_file
 from codesage.audit.models import AuditEvent
 from datetime import datetime
 
+from codesage.snapshot.versioning import SnapshotVersionManager
+from codesage.config.defaults import SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG
+
 @click.command(name="governance-plan", help="Generate a governance plan from a project snapshot.")
 @click.option(
-    "--input",
-    "input_path",
+    "--snapshot-version",
+    "snapshot_version",
     required=True,
-    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
-    help="Path to the input project snapshot YAML file.",
+    help="The version of the snapshot to use.",
+)
+@click.option(
+    "--project",
+    "project_name",
+    required=True,
+    help="The name of the project.",
 )
 @click.option(
     "--output",
@@ -30,21 +38,22 @@ from datetime import datetime
 @click.pass_context
 def governance_plan(
     ctx,
-    input_path: str,
+    snapshot_version: str,
+    project_name: str,
     output_path: str,
     group_by: str | None,
     max_tasks_per_file: int | None,
 ):
     """
-    Generates a governance plan from a project snapshot YAML file.
+    Generates a governance plan from a project snapshot.
     """
     audit_logger = ctx.obj.audit_logger
-    project_name = None
     try:
-        click.echo(f"Loading snapshot from {input_path}...")
-        snapshot_data = read_yaml_file(Path(input_path))
-        snapshot = ProjectSnapshot.model_validate(snapshot_data)
-        project_name = snapshot.metadata.project_name
+        manager = SnapshotVersionManager(SNAPSHOT_DIR, project_name, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+        snapshot = manager.load_snapshot(snapshot_version)
+        if not snapshot:
+            click.echo(f"Snapshot {snapshot_version} not found for project '{project_name}'.", err=True)
+            return
 
         # Apply config overrides
         config = GovernanceConfig.default()
@@ -74,7 +83,7 @@ def governance_plan(
                 project_name=project_name,
                 command="governance-plan",
                 args={
-                    "input_path": input_path,
+                    "snapshot_version": snapshot_version,
                     "output_path": output_path,
                     "group_by": group_by,
                     "max_tasks_per_file": max_tasks_per_file,

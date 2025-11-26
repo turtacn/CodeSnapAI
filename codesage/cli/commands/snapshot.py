@@ -3,7 +3,7 @@ import os
 import json
 import gzip
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from codesage.snapshot.versioning import SnapshotVersionManager
@@ -46,7 +46,7 @@ from codesage.semantic_digest.java_snapshot_builder import JavaSemanticSnapshotB
 from codesage.audit.models import AuditEvent
 
 
-def _create_snapshot_data(path):
+def _create_snapshot_data(path, project_name):
     file_snapshots = []
     for root, dirs, files in os.walk(path):
         dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS]
@@ -81,7 +81,7 @@ def _create_snapshot_data(path):
         metadata=SnapshotMetadata(
             version="",
             timestamp=datetime.now(),
-            project_name=os.path.basename(os.path.abspath(path)),
+            project_name=project_name,
             file_count=len(file_snapshots),
             total_size=total_size,
             tool_version=tool_version,
@@ -97,15 +97,16 @@ def _create_snapshot_data(path):
 
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
+@click.option('--project', '-p', 'project_name_override', help='Override the project name.')
 @click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest']), default='json', help='Snapshot format.')
 @click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
 @click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'java', 'auto']), default='auto', help='Language to analyze.')
 @click.pass_context
-def create(ctx, path, format, output, compress, language):
+def create(ctx, path, project_name_override, format, output, compress, language):
     """Create a new snapshot from the given path."""
     audit_logger = ctx.obj.audit_logger
-    project_name = os.path.basename(os.path.abspath(path))
+    project_name = project_name_override or os.path.basename(os.path.abspath(path))
     try:
         root_path = Path(path)
 
@@ -168,31 +169,38 @@ def create(ctx, path, format, output, compress, language):
             click.echo(f"{language.capitalize()} semantic digest created at {output}")
             return
 
-        snapshot_data = _create_snapshot_data(path)
+        snapshot_data = _create_snapshot_data(path, project_name)
 
         if output:
             output_path = Path(output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, 'w') as f:
+            # Use model_dump_json for consistency
+            with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(snapshot_data.model_dump_json(indent=2))
 
             click.echo(f"Snapshot created at {output}")
         else:
-            manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+            manager = SnapshotVersionManager(SNAPSHOT_DIR, project_name, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+
+            # The format for saving via manager is 'json', not the input format for semantic digests
+            save_format = 'json'
+
             if compress:
-                snapshot_path = manager.save_snapshot(snapshot_data, format)
+                snapshot_path = manager.save_snapshot(snapshot_data, save_format)
+
+                # Compress the file
                 with open(snapshot_path, 'rb') as f_in:
                     with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
                         f_out.writelines(f_in)
                 os.remove(snapshot_path)
                 click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
             else:
-                snapshot_path = manager.save_snapshot(snapshot_data, format)
+                snapshot_path = manager.save_snapshot(snapshot_data, save_format)
                 click.echo(f"Snapshot created at {snapshot_path}")
     finally:
         audit_logger.log(
             AuditEvent(
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 event_type="cli.snapshot.create",
                 project_name=project_name,
                 command="snapshot create",
@@ -207,56 +215,52 @@ def create(ctx, path, format, output, compress, language):
         )
 
 @snapshot.command('list')
-def list_snapshots():
-    """List all available snapshots."""
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+@click.option('--project', '-p', required=True, help='The name of the project.')
+def list_snapshots(project):
+    """List all available snapshots for a project."""
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, project, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
     snapshots = manager.list_snapshots()
     if not snapshots:
-        click.echo("No snapshots found.")
+        click.echo(f"No snapshots found for project '{project}'.")
         return
     for s in snapshots:
         click.echo(f"- {s['version']} ({s['timestamp']})")
 
 @snapshot.command('show')
 @click.argument('version')
-def show(version):
+@click.option('--project', '-p', required=True, help='The name of the project.')
+def show(version, project):
     """Show details of a specific snapshot."""
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, project, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
     snapshot_data = manager.load_snapshot(version)
     if not snapshot_data:
-        click.echo(f"Snapshot {version} not found.", err=True)
+        click.echo(f"Snapshot {version} not found for project '{project}'.", err=True)
         return
     click.echo(snapshot_data.model_dump_json(indent=2))
 
 @snapshot.command('cleanup')
+@click.option('--project', '-p', required=True, help='The name of the project.')
 @click.option('--dry-run', is_flag=True, help='Show which snapshots would be deleted.')
-def cleanup(dry_run):
-    """Clean up old snapshots."""
-    from datetime import timedelta
-
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+def cleanup(project, dry_run):
+    """Clean up old snapshots for a project."""
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, project, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
 
     if dry_run:
         index = manager._load_index()
-        now = datetime.now()
+        if not index:
+            click.echo(f"No snapshots to clean up for project '{project}'.")
+            return
 
-        expired_by_date = [
-            s for s in index
-            if now - datetime.fromisoformat(s["timestamp"]) > timedelta(days=manager.retention_days)
-        ]
+        now = datetime.now(timezone.utc)
+        expired_snapshots = manager._get_expired_snapshots(index, now)
 
-        sorted_by_date = sorted(index, key=lambda s: s["timestamp"], reverse=True)
-        expired_by_count = sorted_by_date[manager.max_versions:]
-
-        expired = {s['version']: s for s in expired_by_date + expired_by_count}.values()
-
-        if not expired:
-            click.echo("No snapshots to clean up.")
+        if not expired_snapshots:
+            click.echo(f"No snapshots to clean up for project '{project}'.")
             return
 
         click.echo("Snapshots to be deleted:")
-        for s in expired:
+        for s in expired_snapshots:
             click.echo(f"- {s['version']}")
     else:
         manager.cleanup_expired_snapshots()
-        click.echo("Expired snapshots have been cleaned up.")
+        click.echo(f"Expired snapshots for project '{project}' have been cleaned up.")
