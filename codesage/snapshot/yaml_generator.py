@@ -13,11 +13,14 @@ class YAMLGenerator(SnapshotGenerator):
             return analysis_results[0]
         raise NotImplementedError("Direct generation from analysis_results is not supported in this workflow.")
 
-    def export(self, snapshot: ProjectSnapshot, output_path: Path) -> None:
-        """Exports the ProjectSnapshot to a YAML file."""
-        # Use Pydantic's serialization which will include all fields by default,
-        # including the new `issues` and `issues_summary` fields.
-        data = snapshot.model_dump(mode="json", exclude_none=True)
+    def export(self, snapshot: Any, output_path: Path) -> None:
+        """Exports the ProjectSnapshot or a dictionary to a YAML file."""
+        if isinstance(snapshot, ProjectSnapshot):
+            data = snapshot.model_dump(mode="json", exclude_none=True)
+        elif isinstance(snapshot, dict):
+            data = snapshot
+        else:
+            raise TypeError("Unsupported snapshot type for YAML export")
 
         with open(output_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)

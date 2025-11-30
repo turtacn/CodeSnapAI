@@ -98,7 +98,7 @@ def _create_snapshot_data(path, project_name):
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
 @click.option('--project', '-p', 'project_name_override', help='Override the project name.')
-@click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest']), default='json', help='Snapshot format.')
+@click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest', 'go-semantic-digest']), default='json', help='Snapshot format.')
 @click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
 @click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'java', 'auto']), default='auto', help='Language to analyze.')
@@ -110,7 +110,7 @@ def create(ctx, path, project_name_override, format, output, compress, language)
     try:
         root_path = Path(path)
 
-        if format == 'python-semantic-digest':
+        if format in ['python-semantic-digest', 'go-semantic-digest']:
             if output is None:
                 output = f"{root_path.name}_{language}_semantic_digest.yaml"
 
@@ -118,47 +118,36 @@ def create(ctx, path, project_name_override, format, output, compress, language)
             builder = None
 
             if language == 'auto':
-                # We cannot easily auto-detect here without merging multiple snapshots logic which is in scan.py
-                # For now, we will fail or fallback to scanning all supported languages and picking one or errors.
-                # However, reusing logic from scan.py might be better.
-                # But to keep it simple and since scan.py does the heavy lifting for scanning,
-                # we might just recommend using scan command for multi-language.
-                # But the task requires snapshot command update too.
-
-                # Let's implement basic single-builder detection or multi-builder if possible.
-                # Reusing logic from scan.py is hard because scan.py logic is not exported nicely.
-                # Let's just check extensions and pick the first found or error if multiple?
-                # Or assume user passes specific language if they want specific digest.
-                # But let's try to support 'auto' by picking the most prominent language or just python if ambiguous.
-
-                # Better approach: Import detection logic from scan.py if I move it to a utility.
-                # I defined detect_languages in scan.py, I should have put it in utils.
-
-                # For now, I'll support 'java' explicitly and handle 'auto' minimally.
-                click.echo("Auto detection for snapshot create is partial. Please specify language for best results.")
-                # Simple check
-                if list(root_path.rglob("*.java")):
-                    language = "java"
-                elif list(root_path.rglob("*.py")):
-                    language = "python"
-                elif list(root_path.rglob("*.go")):
-                    language = "go"
-                elif list(root_path.rglob("*.sh")):
-                    language = "shell"
+                if format == 'python-semantic-digest':
+                    language = 'python'
+                elif format == 'go-semantic-digest':
+                    language = 'go'
                 else:
-                    click.echo("Could not auto-detect language.", err=True)
-                    return
+                    # Fallback for auto-detection if format doesn't imply language
+                    if list(root_path.rglob("*.py")):
+                        language = "python"
+                    elif list(root_path.rglob("*.go")):
+                        language = "go"
+                    elif list(root_path.rglob("*.java")):
+                        language = "java"
+                    elif list(root_path.rglob("*.sh")):
+                        language = "shell"
+                    else:
+                        click.echo("Could not auto-detect language.", err=True)
+                        return
 
-            if language == 'python':
+            if language == 'python' and format == 'python-semantic-digest':
                 builder = PythonSemanticSnapshotBuilder(root_path, config)
-            elif language == 'go':
+            elif language == 'go' and format == 'go-semantic-digest':
                 builder = GoSemanticSnapshotBuilder(root_path, config)
+            # Preserve other language builders for future use, but they won't be triggered
+            # by the current format options.
             elif language == 'shell':
                 builder = ShellSemanticSnapshotBuilder(root_path, config)
             elif language == 'java':
                 builder = JavaSemanticSnapshotBuilder(root_path, config)
             else:
-                click.echo(f"Unsupported language: {language}", err=True)
+                click.echo(f"Unsupported language/format combination: {language}/{format}", err=True)
                 return
 
             project_snapshot = builder.build()
@@ -240,10 +229,15 @@ def show(version, project):
 
 @snapshot.command('cleanup')
 @click.option('--project', '-p', required=True, help='The name of the project.')
+@click.option('--keep', type=int, default=None, help='Number of recent snapshots to keep.')
 @click.option('--dry-run', is_flag=True, help='Show which snapshots would be deleted.')
-def cleanup(project, dry_run):
+def cleanup(project, keep, dry_run):
     """Clean up old snapshots for a project."""
-    manager = SnapshotVersionManager(SNAPSHOT_DIR, project, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+    config_override = DEFAULT_SNAPSHOT_CONFIG['snapshot'].copy()
+    if keep is not None:
+        config_override['versioning']['max_versions'] = keep
+
+    manager = SnapshotVersionManager(SNAPSHOT_DIR, project, config_override)
 
     if dry_run:
         index = manager._load_index()
@@ -262,5 +256,5 @@ def cleanup(project, dry_run):
         for s in expired_snapshots:
             click.echo(f"- {s['version']}")
     else:
-        manager.cleanup_expired_snapshots()
-        click.echo(f"Expired snapshots for project '{project}' have been cleaned up.")
+        deleted_count = manager.cleanup_expired_snapshots()
+        click.echo(f"Cleaned up {deleted_count} expired snapshots for project '{project}'.")

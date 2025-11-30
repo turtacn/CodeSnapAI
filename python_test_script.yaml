@@ -1,0 +1,71 @@
+root: /app/examples/python_test
+type: python
+files:
+- main.py
+modules:
+  main:
+    f:
+    - main.py
+    im: []
+    fim: !!python/object/apply:collections.defaultdict
+    - !!python/name:builtins.list ''
+    cl:
+    - n: Greeter
+      ln: 1
+      bs: []
+      dc: []
+      attrs: []
+    fn:
+    - n: main
+      ln: 8
+      cx: 1
+      args: []
+      dc: []
+      ret: null
+      async: false
+    md:
+      Greeter:
+      - n: __init__
+        ln: 2
+        cx: 1
+        args:
+        - self
+        - name
+        dc: []
+        ret: null
+        async: false
+      - n: greet
+        ln: 5
+        cx: 1
+        args:
+        - self
+        dc: []
+        ret: null
+        async: false
+    dc: []
+    ds: []
+    cv:
+    - n: greeter
+      ln: 9
+      const: false
+      val: Greeter('world')
+    cl_attr: []
+    stat:
+      async: 0
+      th: 0
+      io: {}
+      err:
+        total: 0
+        generic: 0
+    sm: CLS:1；FN:3；AVG_CX:1.0
+deps: {}
+sum:
+  mod_count: 1
+  cl_count: 1
+  fn_count: 3
+  file_count: 1
+  total_ccn: 3
+  config_files: []
+  tech_stack: []
+  has_async: false
+  uses_type_hints: false

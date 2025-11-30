@@ -83,47 +83,59 @@ class SnapshotVersionManager:
         self._save_index(index)
 
     def _get_expired_snapshots(self, index: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
-        """Identifies expired snapshots."""
-        valid_snapshots = []
-        for s in index:
-            try:
-                ts = datetime.fromisoformat(s["timestamp"])
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
-                if now - ts <= timedelta(days=self.retention_days):
-                    valid_snapshots.append(s)
-            except ValueError:
-                # Skip malformed timestamps
-                continue
+        """Identifies expired snapshots based on retention policies."""
 
-        if len(valid_snapshots) > self.max_versions:
-            valid_snapshots = sorted(
-                valid_snapshots, key=lambda s: s["timestamp"], reverse=True
-            )[:self.max_versions]
+        def parse_timestamp(ts_str):
+            ts = datetime.fromisoformat(ts_str)
+            if ts.tzinfo is None:
+                return ts.replace(tzinfo=timezone.utc)
+            return ts
 
-        valid_versions = {s["version"] for s in valid_snapshots}
-        return [s for s in index if s["version"] not in valid_versions]
+        try:
+            sorted_snapshots = sorted(
+                index,
+                key=lambda s: parse_timestamp(s["timestamp"]),
+                reverse=True
+            )
+        except (ValueError, TypeError):
+            return []
 
-    def cleanup_expired_snapshots(self):
-        """Removes expired snapshots based on retention days and max versions."""
+        kept_snapshots = sorted_snapshots[:self.max_versions]
+
+        kept_by_date = {
+            s['version'] for s in kept_snapshots
+            if (now - parse_timestamp(s["timestamp"])) <= timedelta(days=self.retention_days)
+        }
+
+        return [s for s in index if s["version"] not in kept_by_date]
+
+    def cleanup_expired_snapshots(self) -> int:
+        """Removes expired snapshots and returns the count of deleted files."""
         index = self._load_index()
         if not index:
-            return
+            return 0
 
         now = datetime.now(timezone.utc)
         expired_snapshots = self._get_expired_snapshots(index, now)
 
         if not expired_snapshots:
-            return
+            return 0
 
         expired_versions = {s["version"] for s in expired_snapshots}
         valid_snapshots = [s for s in index if s["version"] not in expired_versions]
 
+        deleted_count = 0
         for snapshot_data in expired_snapshots:
-            if os.path.exists(snapshot_data["path"]):
-                os.remove(snapshot_data["path"])
+            snapshot_path = snapshot_data.get("path")
+            if snapshot_path and os.path.exists(snapshot_path):
+                try:
+                    os.remove(snapshot_path)
+                    deleted_count += 1
+                except OSError:
+                    pass
 
         self._save_index(valid_snapshots)
+        return deleted_count
 
     def list_snapshots(self) -> List[Dict[str, Any]]:
         """Lists all managed snapshots from the index."""
