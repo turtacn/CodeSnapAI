@@ -92,8 +92,10 @@ def run_standalone_script(script_path: Path, project_dir: Path) -> dict:
         raise FileNotFoundError(f"Script {script_abs.name} did not generate {output_filename}")
 
     with open(output_filepath, "r", encoding="utf-8") as f:
-        # Use FullLoader to handle Python-specific tags like defaultdict
-        data = yaml.load(f, Loader=yaml.FullLoader)
+        if "py-semantic" in script_path.name:
+            data = yaml.unsafe_load(f)
+        else:
+            data = yaml.safe_load(f)
 
     # Clean up the generated file
     output_filepath.unlink()
@@ -101,7 +103,8 @@ def run_standalone_script(script_path: Path, project_dir: Path) -> dict:
     return data
 
 
-def test_python_snapshot_consistency(runner: CliRunner, setup_projects):
+@pytest.mark.parametrize("output_format", ["yaml", "json"])
+def test_python_snapshot_consistency(runner: CliRunner, setup_projects, output_format):
     """Verify codesage 'py' format matches the original Python script."""
     base_dir, py_project_dir, _ = setup_projects
     script_path = Path("semantic-snapshot/py-semantic-snapshot-v3.py")
@@ -110,13 +113,13 @@ def test_python_snapshot_consistency(runner: CliRunner, setup_projects):
     expected_output = run_standalone_script(script_path, py_project_dir)
 
     # 2. Run codesage
-    output_file = base_dir / "codesage_py_output.yml"
+    output_file = base_dir / f"codesage_py_output.{output_format}"
     result = runner.invoke(
         main,
         [
             "snapshot", "create",
             str(py_project_dir),
-            "--format", "python-semantic-digest",
+            "--format", output_format,
             "--language", "python",
             "--output", str(output_file)
         ],
@@ -124,16 +127,19 @@ def test_python_snapshot_consistency(runner: CliRunner, setup_projects):
     )
     assert result.exit_code == 0
     assert output_file.exists()
-    codesage_output = load_yaml(output_file)
+
+    if output_format == "yaml":
+        codesage_output = load_yaml(output_file)
+    else:
+        with open(output_file, "r", encoding="utf-8") as f:
+            codesage_output = json.load(f)
 
     # 3. Compare outputs
-    assert codesage_output["root"] == expected_output["root"]
-    assert "main" in codesage_output["modules"]
-    assert len(codesage_output["modules"]["main"]["cl"]) > 0
-    assert codesage_output["modules"]["main"]["cl"][0]["n"] == "MyClass"
+    assert codesage_output == expected_output
 
 
-def test_go_snapshot_consistency(runner: CliRunner, setup_projects):
+@pytest.mark.parametrize("output_format", ["yaml", "json"])
+def test_go_snapshot_consistency(runner: CliRunner, setup_projects, output_format):
     """Verify codesage 'go' format matches the original Go script."""
     base_dir, _, go_project_dir = setup_projects
     script_path = Path("semantic-snapshot/go-semantic-snapshot-v4.py")
@@ -142,13 +148,13 @@ def test_go_snapshot_consistency(runner: CliRunner, setup_projects):
     expected_output = run_standalone_script(script_path, go_project_dir)
 
     # 2. Run codesage
-    output_file = base_dir / "codesage_go_output.yml"
+    output_file = base_dir / f"codesage_go_output.{output_format}"
     result = runner.invoke(
         main,
         [
             "snapshot", "create",
             str(go_project_dir),
-            "--format", "go-semantic-digest",
+            "--format", output_format,
             "--language", "go",
             "--output", str(output_file)
         ],
@@ -156,7 +162,12 @@ def test_go_snapshot_consistency(runner: CliRunner, setup_projects):
     )
     assert result.exit_code == 0
     assert output_file.exists()
-    codesage_output = load_yaml(output_file)
+
+    if output_format == "yaml":
+        codesage_output = load_yaml(output_file)
+    else:
+        with open(output_file, "r", encoding="utf-8") as f:
+            codesage_output = json.load(f)
 
     # 3. Compare outputs
     # Normalize for comparison - e.g., rounding floats if necessary
@@ -187,24 +198,26 @@ def test_go_snapshot_consistency(runner: CliRunner, setup_projects):
     assert main_pkg_contents["md"]["Greeter"][0]["n"] == "Greet", "Greet method not found"
 
 
-def test_default_snapshot_creation(runner: CliRunner, setup_projects, tmp_path):
-    """Test default snapshot creation creates a .json file."""
-    _, py_project_dir, _ = setup_projects
+def test_original_snapshot_creation_for_other_languages(runner: CliRunner, tmp_path):
+    """Test that the original snapshot mechanism is used for non-Python/Go languages."""
+    java_project_dir = tmp_path / "java_project"
+    java_project_dir.mkdir()
+    (java_project_dir / "Main.java").write_text("class Main {}")
 
-    # Change to a temporary directory to isolate .codesage folder
     os.chdir(tmp_path)
 
     result = runner.invoke(
-        main, ["snapshot", "create", str(py_project_dir)], catch_exceptions=False
+        main,
+        ["snapshot", "create", str(java_project_dir), "--language", "java"],
+        catch_exceptions=False,
     )
     assert result.exit_code == 0
 
-    snapshot_dir = tmp_path / ".codesage" / "snapshots" / py_project_dir.name
+    snapshot_dir = tmp_path / ".codesage" / "snapshots" / java_project_dir.name
     assert snapshot_dir.exists()
 
-    # Check for the presence of at least one JSON snapshot file
-    json_files = list(snapshot_dir.glob("*.json"))
-    assert len(json_files) > 0, "No JSON snapshot file was created"
+    json_files = list(snapshot_dir.glob("v*.json"))
+    assert len(json_files) > 0, "No versioned JSON snapshot file was created"
 
 
 def test_snapshot_show_and_cleanup(runner: CliRunner, setup_projects, tmp_path):
@@ -214,28 +227,38 @@ def test_snapshot_show_and_cleanup(runner: CliRunner, setup_projects, tmp_path):
 
     os.chdir(tmp_path)
 
-    # 1. Create a few snapshots
+    # 1. Create a few snapshots using the original mechanism
     for _ in range(3):
-        res = runner.invoke(main, ["snapshot", "create", str(py_project_dir), "--project", project_name], catch_exceptions=False)
+        res = runner.invoke(
+            main,
+            ["snapshot", "create", str(py_project_dir), "--project", project_name, "--language", "shell"], # Use a non-py/go language
+            catch_exceptions=False,
+        )
         assert res.exit_code == 0
 
     snapshot_dir = tmp_path / ".codesage" / "snapshots" / project_name
-    # Filter out symlinks and the index file
     snapshots = [p for p in snapshot_dir.glob("v*.json")]
     assert len(snapshots) == 3
 
     # 2. Test 'snapshot show'
-    result = runner.invoke(main, ["snapshot", "show", "--project", project_name, snapshots[0].stem], catch_exceptions=False)
+    result = runner.invoke(
+        main,
+        ["snapshot", "show", "--project", project_name, snapshots[0].stem],
+        catch_exceptions=False,
+    )
     assert result.exit_code == 0
     assert project_name in result.output
     assert snapshots[0].stem in result.output
 
     # 3. Test 'snapshot cleanup'
-    result = runner.invoke(main, ["snapshot", "cleanup", "--project", project_name, "--keep", "1"], catch_exceptions=False)
+    result = runner.invoke(
+        main,
+        ["snapshot", "cleanup", "--project", project_name, "--keep", "1"],
+        catch_exceptions=False,
+    )
     assert result.exit_code == 0
 
     remaining_snapshots = [p for p in snapshot_dir.glob("v*.json")]
     assert len(remaining_snapshots) == 1
 
-    # Restore original working directory if needed by other tests
     os.chdir(Path.cwd())

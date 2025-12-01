@@ -1,8 +1,0 @@
-root: go_test
-pkgs:
-  main:
-    files:
-    - main.go
-meta:
-  files: 1
-  pkgs: 1

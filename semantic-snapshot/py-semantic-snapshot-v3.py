@@ -700,29 +700,17 @@ def generate_semantic_digest(repo_path, output_path, args):
         "uses_type_hints": False, 
     }
 
-    # Convert defaultdict to dict for clean YAML output
-    def convert_defaultdict_to_dict(d):
-        if isinstance(d, defaultdict):
-            d = {k: convert_defaultdict_to_dict(v) for k, v in d.items()}
-        elif isinstance(d, dict):
-            return {k: convert_defaultdict_to_dict(v) for k, v in d.items()}
-        elif isinstance(d, list):
-            return [convert_defaultdict_to_dict(i) for i in d]
-        return d
-
-    final_digest = convert_defaultdict_to_dict(digest)
-
     output_path = ensure_unicode(output_path)
     try:
         with open(output_path, "w", encoding="utf-8") as f:
-            yaml.dump(
-                final_digest,
-                f,
+            yaml_content = yaml.dump(
+                digest,
                 allow_unicode=True,
                 default_flow_style=False,
                 sort_keys=False,
                 width=120,
             )
+            f.write(yaml_content)
 
         print("✅ Semantic project digest generated: {}".format(output_path))
         print(

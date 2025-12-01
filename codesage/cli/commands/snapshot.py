@@ -98,7 +98,7 @@ def _create_snapshot_data(path, project_name):
 @snapshot.command('create')
 @click.argument('path', type=click.Path(exists=True, dir_okay=True))
 @click.option('--project', '-p', 'project_name_override', help='Override the project name.')
-@click.option('--format', '-f', type=click.Choice(['json', 'python-semantic-digest', 'go-semantic-digest']), default='json', help='Snapshot format.')
+@click.option('--format', '-f', type=click.Choice(['yaml', 'json', 'md']), default='yaml', help='Snapshot format.')
 @click.option('--output', '-o', type=click.Path(), default=None, help='Output file path.')
 @click.option('--compress', is_flag=True, help='Enable compression.')
 @click.option('--language', '-l', type=click.Choice(['python', 'go', 'shell', 'java', 'auto']), default='auto', help='Language to analyze.')
@@ -110,82 +110,69 @@ def create(ctx, path, project_name_override, format, output, compress, language)
     try:
         root_path = Path(path)
 
-        if format in ['python-semantic-digest', 'go-semantic-digest']:
-            if output is None:
-                output = f"{root_path.name}_{language}_semantic_digest.yaml"
+        if language == 'auto':
+            if list(root_path.rglob("*.py")):
+                language = "python"
+            elif list(root_path.rglob("*.go")):
+                language = "go"
+            elif list(root_path.rglob("*.java")):
+                language = "java"
+            elif list(root_path.rglob("*.sh")):
+                language = "shell"
+            else:
+                click.echo("Could not auto-detect language.", err=True)
+                return
 
+        if language in ['python', 'go']:
             config = SnapshotConfig()
             builder = None
-
-            if language == 'auto':
-                if format == 'python-semantic-digest':
-                    language = 'python'
-                elif format == 'go-semantic-digest':
-                    language = 'go'
-                else:
-                    # Fallback for auto-detection if format doesn't imply language
-                    if list(root_path.rglob("*.py")):
-                        language = "python"
-                    elif list(root_path.rglob("*.go")):
-                        language = "go"
-                    elif list(root_path.rglob("*.java")):
-                        language = "java"
-                    elif list(root_path.rglob("*.sh")):
-                        language = "shell"
-                    else:
-                        click.echo("Could not auto-detect language.", err=True)
-                        return
-
-            if language == 'python' and format == 'python-semantic-digest':
+            if language == 'python':
                 builder = PythonSemanticSnapshotBuilder(root_path, config)
-            elif language == 'go' and format == 'go-semantic-digest':
+            else: # language == 'go'
                 builder = GoSemanticSnapshotBuilder(root_path, config)
-            # Preserve other language builders for future use, but they won't be triggered
-            # by the current format options.
-            elif language == 'shell':
-                builder = ShellSemanticSnapshotBuilder(root_path, config)
-            elif language == 'java':
-                builder = JavaSemanticSnapshotBuilder(root_path, config)
-            else:
-                click.echo(f"Unsupported language/format combination: {language}/{format}", err=True)
-                return
 
             project_snapshot = builder.build()
 
-            generator = YAMLGenerator()
-            generator.export(project_snapshot, Path(output))
+            if output is None:
+                output = f"{root_path.name}_snapshot.{format}"
 
-            click.echo(f"{language.capitalize()} semantic digest created at {output}")
-            return
-
-        snapshot_data = _create_snapshot_data(path, project_name)
-
-        if output:
             output_path = Path(output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            # Use model_dump_json for consistency
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(snapshot_data.model_dump_json(indent=2))
+
+            if format == 'yaml':
+                generator = YAMLGenerator()
+                generator.export(project_snapshot, output_path)
+            elif format == 'json':
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(project_snapshot, f, indent=2)
+            elif format == 'md':
+                click.echo("Markdown format is not yet implemented.", err=True)
+                return
 
             click.echo(f"Snapshot created at {output}")
-        else:
-            manager = SnapshotVersionManager(SNAPSHOT_DIR, project_name, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
 
-            # The format for saving via manager is 'json', not the input format for semantic digests
-            save_format = 'json'
+        else: # Fallback to original snapshot logic for other languages
+            snapshot_data = _create_snapshot_data(path, project_name)
 
-            if compress:
-                snapshot_path = manager.save_snapshot(snapshot_data, save_format)
-
-                # Compress the file
-                with open(snapshot_path, 'rb') as f_in:
-                    with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
-                        f_out.writelines(f_in)
-                os.remove(snapshot_path)
-                click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
+            if output:
+                output_path = Path(output)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(snapshot_data.model_dump_json(indent=2))
+                click.echo(f"Snapshot created at {output}")
             else:
-                snapshot_path = manager.save_snapshot(snapshot_data, save_format)
-                click.echo(f"Snapshot created at {snapshot_path}")
+                manager = SnapshotVersionManager(SNAPSHOT_DIR, project_name, DEFAULT_SNAPSHOT_CONFIG['snapshot'])
+                save_format = 'json'
+                if compress:
+                    snapshot_path = manager.save_snapshot(snapshot_data, save_format)
+                    with open(snapshot_path, 'rb') as f_in:
+                        with gzip.open(f"{snapshot_path}.gz", 'wb') as f_out:
+                            f_out.writelines(f_in)
+                    os.remove(snapshot_path)
+                    click.echo(f"Compressed snapshot created at {snapshot_path}.gz")
+                else:
+                    snapshot_path = manager.save_snapshot(snapshot_data, save_format)
+                    click.echo(f"Snapshot created at {snapshot_path}")
     finally:
         audit_logger.log(
             AuditEvent(
