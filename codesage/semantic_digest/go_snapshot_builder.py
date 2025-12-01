@@ -233,8 +233,8 @@ func extractSig(t *ast.FuncType) (params, returns string) {
 			if len(f.Names) == 0 {
 				ps = append(ps, typeStr)
 			} else {
-				for _, name := range f.Names {
-					ps = append(ps, name.Name+" "+typeStr)
+				for range f.Names {
+					ps = append(ps, typeStr) // 简化：只存类型，省 token
 				}
 			}
 		}
@@ -264,25 +264,41 @@ func formatType(expr ast.Expr) string {
 """
 
 class GoSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
-    def build(self) -> Dict[str, Any]:
-        has_go = False
+    _parser_bin_path = None
+    _temp_dir = None
+
+    def __init__(self, root_path: Path, config: SnapshotConfig):
+        super().__init__(root_path, config)
+        self._setup_parser()
+
+    def _setup_parser(self):
+        if GoSemanticSnapshotBuilder._parser_bin_path:
+            return
+
         try:
             subprocess.check_call(["go", "version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            has_go = True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+            GoSemanticSnapshotBuilder._temp_dir = tempfile.TemporaryDirectory()
+            parser_src_path = os.path.join(GoSemanticSnapshotBuilder._temp_dir.name, "parser.go")
+            with open(parser_src_path, "w", encoding="utf-8") as f:
+                f.write(GO_AST_PARSER_SRC)
 
+            parser_bin_path = os.path.join(GoSemanticSnapshotBuilder._temp_dir.name, "parser")
+            subprocess.run(["go", "build", "-o", parser_bin_path, parser_src_path], capture_output=True, text=True, check=True)
+            GoSemanticSnapshotBuilder._parser_bin_path = parser_bin_path
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            GoSemanticSnapshotBuilder._parser_bin_path = None
+
+    def build(self) -> Dict[str, Any]:
         digest = {
             "root": self.root_path.name, "pkgs": {}, "graph": {}, "meta": {}
         }
 
         pkg_map = defaultdict(list)
         all_files = self._collect_files()
-        total_cx = 0
         total_err_checks = 0
 
         for fpath in all_files:
-            data = self._extract_semantics(fpath, has_go)
+            data = self._extract_semantics(fpath)
             pkg_name = data.get("pk", "unknown")
             clean_data = {k: v for k, v in data.items() if v}
             clean_data["f"] = str(fpath.relative_to(self.root_path))
@@ -294,9 +310,6 @@ class GoSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
                     "ch": data["stat"].get("ch", 0),
                     "er": data["stat"].get("er", 0),
                 }
-
-            if "fn" in data:
-                total_cx += sum(fn.get("cx", 1) for fn in data["fn"])
 
             pkg_map[pkg_name].append(clean_data)
 
@@ -315,8 +328,8 @@ class GoSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
 
         digest["meta"] = {
             "files": len(all_files), "pkgs": len(pkg_map),
-            "total_complexity": total_cx, "error_hotspots": total_err_checks,
-            "strategy": "AST" if has_go else "Regex"
+            "error_hotspots": total_err_checks,
+            "strategy": "AST" if GoSemanticSnapshotBuilder._parser_bin_path else "Regex"
         }
 
         return digest
@@ -324,25 +337,18 @@ class GoSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
     def _collect_files(self) -> List[Path]:
         return list(self.root_path.rglob("*.go"))
 
-    def _extract_semantics(self, file_path: Path, has_go: bool) -> Dict[str, Any]:
-        if has_go:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                parser_src_path = os.path.join(temp_dir, "parser.go")
-                with open(parser_src_path, "w", encoding="utf-8") as f:
-                    f.write(GO_AST_PARSER_SRC)
-
-                parser_bin_path = os.path.join(temp_dir, "parser")
-                try:
-                    build_result = subprocess.run(["go", "build", "-o", parser_bin_path, parser_src_path], capture_output=True, text=True, check=True)
-                    cmd = [parser_bin_path, str(file_path)]
-                    output = subprocess.check_output(cmd, stderr=subprocess.PIPE, timeout=15)
-                    return json.loads(output.decode('utf-8'))
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
-                    print(f"AST parsing failed for {file_path}: {e}")
-                    if isinstance(e, subprocess.CalledProcessError):
-                        print(f"Stderr: {e.stderr}")
-                        if hasattr(e, 'stdout'):
-                            print(f"Stdout: {e.stdout}")
+    def _extract_semantics(self, file_path: Path) -> Dict[str, Any]:
+        if GoSemanticSnapshotBuilder._parser_bin_path:
+            try:
+                cmd = [GoSemanticSnapshotBuilder._parser_bin_path, str(file_path)]
+                output = subprocess.check_output(cmd, stderr=subprocess.PIPE, timeout=15)
+                return json.loads(output.decode('utf-8'))
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+                print(f"AST parsing failed for {file_path}: {e}")
+                if isinstance(e, subprocess.CalledProcessError):
+                    print(f"Stderr: {e.stderr}")
+                    if hasattr(e, 'stdout'):
+                        print(f"Stdout: {e.stdout}")
 
         # Fallback to regex
         content = file_path.read_text(encoding="utf-8", errors="ignore")

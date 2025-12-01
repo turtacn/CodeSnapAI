@@ -102,6 +102,17 @@ class PythonSemanticSnapshotBuilder(BaseLanguageSnapshotBuilder):
                     digest["deps"][module_name].add(module)
 
         self._finalize_digest(digest, total_ccn, all_imports)
+
+        # Convert defaultdicts to dicts for clean output
+        final_modules = {}
+        for name, data in digest["modules"].items():
+            data["fim"] = dict(data["fim"])
+            data["dc"] = sorted(list(data["dc"]))
+            final_modules[name] = data
+        digest["modules"] = final_modules
+        digest["deps"] = {mod: sorted(list(deps)) for mod, deps in digest["deps"].items()}
+
+
         return digest
 
     def _collect_files(self) -> List[Path]:
