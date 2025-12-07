@@ -4,7 +4,7 @@ This guide provides a brief overview of the `codesage` command-line tool and its
 
 ## Installation
 
-To install `codesage`, you will need Python 3.8+ and Poetry. Once you have these prerequisites, you can install the tool with the following command:
+To install `codesage`, you will need Python 3.10+ and Poetry. Once you have these prerequisites, you can install the tool with the following command:
 
 ```bash
 poetry install
