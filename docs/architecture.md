@@ -629,14 +629,429 @@ graph TB
 
 ---
 
-## 5. 关键技术选型
+## 5. 语义图引擎架构 (Phase 2)
 
-### 5.1 核心技术栈
+### 5.1 图引擎总体设计
+
+CodeSnapAI Phase 2 引入了统一语义图引擎，将代码分析从基于文件的模式升级为基于图的语义理解模式。
+
+```mermaid
+graph TB
+    %% 图引擎架构
+    subgraph GE[图引擎（Graph Engine）]
+        GB[图构建器<br/>Graph Builder]
+        GM[图模型<br/>Graph Models]
+        GS[图存储<br/>Graph Storage]
+        GQ[图查询<br/>Graph Query]
+        GI[增量更新<br/>Incremental Update]
+    end
+    
+    %% 存储适配器
+    subgraph SA[存储适配器（Storage Adapters）]
+        SA1[Redis适配器<br/>Redis Adapter]
+        SA2[PostgreSQL适配器<br/>PostgreSQL Adapter]
+        SA3[存储抽象层<br/>Storage Abstraction]
+    end
+    
+    %% 查询引擎
+    subgraph QE[查询引擎（Query Engine）]
+        QD[查询DSL<br/>Query DSL]
+        QP[查询处理器<br/>Query Processor]
+        QO[查询优化器<br/>Query Optimizer]
+    end
+    
+    %% 数据流
+    PARSER[解析器输出<br/>Parser Output] --> GB
+    GB --> GM
+    GM --> GS
+    GS --> SA
+    GM --> QE
+    QE --> RESULTS[查询结果<br/>Query Results]
+    
+    %% 增量更新流
+    CHANGES[文件变更<br/>File Changes] --> GI
+    GI --> GM
+    
+    style GE fill:#e3f2fd
+    style SA fill:#f3e5f5
+    style QE fill:#e8f5e9
+```
+
+### 5.2 统一语义图模型
+
+#### 5.2.1 节点类型定义
+
+```yaml
+# 节点类型规范
+node_types:
+  file:
+    description: "源代码文件"
+    properties:
+      - path: "文件路径"
+      - language: "编程语言"
+      - loc: "代码行数"
+      - encoding: "文件编码"
+      - last_modified: "最后修改时间"
+  
+  module:
+    description: "模块或包"
+    properties:
+      - name: "模块名称"
+      - qualified_name: "完全限定名"
+      - version: "版本号"
+      - exports: "导出符号列表"
+  
+  function:
+    description: "函数或方法"
+    properties:
+      - name: "函数名"
+      - qualified_name: "完全限定名"
+      - line_start: "起始行号"
+      - line_end: "结束行号"
+      - complexity: "复杂度"
+      - params: "参数列表"
+      - return_type: "返回类型"
+      - is_async: "是否异步"
+  
+  class:
+    description: "类定义"
+    properties:
+      - name: "类名"
+      - qualified_name: "完全限定名"
+      - base_classes: "基类列表"
+      - methods: "方法列表"
+      - is_abstract: "是否抽象类"
+```
+
+#### 5.2.2 边类型定义
+
+```yaml
+# 边类型规范
+edge_types:
+  contains:
+    description: "包含关系"
+    source_types: ["file", "module", "class"]
+    target_types: ["function", "class", "variable", "module"]
+    properties:
+      - line_number: "所在行号"
+  
+  calls:
+    description: "函数调用关系"
+    source_types: ["function"]
+    target_types: ["function"]
+    properties:
+      - call_site: "调用位置"
+      - call_type: "调用类型(direct/indirect)"
+      - arguments: "参数信息"
+  
+  inherits:
+    description: "继承关系"
+    source_types: ["class"]
+    target_types: ["class"]
+    properties:
+      - inheritance_type: "继承类型"
+  
+  imports:
+    description: "导入关系"
+    source_types: ["file", "module"]
+    target_types: ["module", "function", "class"]
+    properties:
+      - import_type: "导入类型(import/from)"
+      - alias: "别名"
+      - line_number: "导入行号"
+```
+
+### 5.3 存储抽象层设计
+
+#### 5.3.1 存储适配器接口
+
+```python
+class StorageAdapter(ABC):
+    """存储适配器抽象接口"""
+    
+    @abstractmethod
+    def save_graph(self, graph: Graph, **kwargs) -> None:
+        """保存完整图到存储"""
+        pass
+    
+    @abstractmethod
+    def load_graph(self, root_node_id: str, max_depth: int = 10) -> Graph:
+        """从根节点加载图"""
+        pass
+    
+    @abstractmethod
+    def query_nodes(self, node_type: str, filters: Dict[str, Any]) -> List[Node]:
+        """查询节点"""
+        pass
+    
+    @abstractmethod
+    def save_node(self, node: Node) -> None:
+        """保存单个节点"""
+        pass
+    
+    @abstractmethod
+    def save_edge(self, edge: Edge) -> None:
+        """保存单个边"""
+        pass
+    
+    @abstractmethod
+    def transaction(self) -> ContextManager[None]:
+        """事务上下文管理器"""
+        pass
+```
+
+#### 5.3.2 Redis存储实现
+
+```mermaid
+graph LR
+    %% Redis存储结构
+    subgraph RS[Redis存储结构]
+        R1[节点存储<br/>node:node_id]
+        R2[边存储<br/>edges:source_id]
+        R3[类型索引<br/>type:node_type]
+        R4[边类型索引<br/>edge_type:edge_type]
+    end
+    
+    %% 存储特性
+    subgraph RF[Redis特性]
+        RF1[TTL过期<br/>1小时默认]
+        RF2[Pipeline批量<br/>提升性能]
+        RF3[MessagePack<br/>序列化]
+        RF4[连接池<br/>并发支持]
+    end
+    
+    RS --> RF
+    
+    style RS fill:#ffebee
+    style RF fill:#e8f5e9
+```
+
+**Redis存储优势**：
+- **高性能缓存**：读写延迟 < 10ms，适合频繁查询场景
+- **TTL自动过期**：避免缓存数据过期，节省存储空间
+- **Pipeline批量操作**：提升大图保存性能
+- **MessagePack序列化**：比JSON更紧凑，序列化速度更快
+
+#### 5.3.3 PostgreSQL存储实现
+
+```sql
+-- 节点表结构
+CREATE TABLE nodes (
+    id VARCHAR(500) PRIMARY KEY,
+    type VARCHAR(50) NOT NULL,
+    properties JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 边表结构
+CREATE TABLE edges (
+    id SERIAL PRIMARY KEY,
+    source VARCHAR(500) NOT NULL,
+    target VARCHAR(500) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    properties JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 性能索引
+CREATE INDEX idx_nodes_type ON nodes(type);
+CREATE INDEX idx_nodes_properties_gin ON nodes USING GIN(properties);
+CREATE INDEX idx_edges_source ON edges(source);
+CREATE INDEX idx_edges_target ON edges(target);
+CREATE INDEX idx_edges_type ON edges(type);
+```
+
+**PostgreSQL存储优势**：
+- **ACID事务**：保证数据一致性，支持复杂操作
+- **JSONB支持**：灵活存储节点属性，支持高效查询
+- **递归CTE**：支持图遍历查询，最大深度可配置
+- **GIN索引**：JSONB属性查询性能优化
+
+### 5.4 查询DSL设计
+
+#### 5.4.1 查询语法规范
+
+```bnf
+# 查询DSL语法定义
+Query ::= FindClause [WhereClause] [LimitClause] [OffsetClause]
+
+FindClause ::= "FIND" NodeType ["AS" Alias]
+NodeType ::= "function" | "class" | "file" | "module" | "variable"
+
+WhereClause ::= "WHERE" Condition {"AND" | "OR" Condition}
+Condition ::= AttributeCondition | RelationCondition
+
+AttributeCondition ::= Attribute Operator Value
+Operator ::= "=" | "!=" | ">" | "<" | ">=" | "<=" | "LIKE"
+
+RelationCondition ::= RelationType String
+RelationType ::= "CALLING" | "INHERITS" | "IMPORTS" | "CONTAINS"
+
+LimitClause ::= "LIMIT" Number
+OffsetClause ::= "OFFSET" Number
+```
+
+#### 5.4.2 查询示例
+
+```sql
+-- 查找高复杂度函数
+FIND function WHERE complexity > 10
+
+-- 查找调用特定函数的所有函数
+FIND function WHERE CALLING 'target_function'
+
+-- 查找继承特定基类的所有类
+FIND class WHERE INHERITS 'BaseClass'
+
+-- 复合条件查询
+FIND function WHERE complexity > 5 AND complexity < 15 LIMIT 50
+
+-- 查找导入特定模块的文件
+FIND file WHERE IMPORTS 'numpy'
+```
+
+#### 5.4.3 查询处理器架构
+
+```mermaid
+graph TB
+    %% 查询处理流程
+    QS[查询字符串<br/>Query String] --> LEX[词法分析<br/>Lexer]
+    LEX --> PARSE[语法分析<br/>Parser]
+    PARSE --> AST[查询AST<br/>Query AST]
+    AST --> VAL[语义验证<br/>Validation]
+    VAL --> OPT[查询优化<br/>Optimization]
+    OPT --> PLAN[执行计划<br/>Execution Plan]
+    PLAN --> EXEC[执行引擎<br/>Execution Engine]
+    EXEC --> RESULT[查询结果<br/>Query Result]
+    
+    %% 优化策略
+    subgraph OS[优化策略]
+        OS1[谓词下推<br/>Predicate Pushdown]
+        OS2[索引选择<br/>Index Selection]
+        OS3[成本估算<br/>Cost Estimation]
+    end
+    
+    OPT --> OS
+    
+    style QS fill:#fff3e0
+    style RESULT fill:#e8f5e9
+    style OS fill:#f3e5f5
+```
+
+### 5.5 增量更新引擎
+
+#### 5.5.1 文件监控与变更检测
+
+```mermaid
+sequenceDiagram
+    participant FS as 文件系统<br/>File System
+    participant FW as 文件监控<br/>File Watcher
+    participant IU as 增量更新器<br/>Incremental Updater
+    participant GB as 图构建器<br/>Graph Builder
+    participant SA as 存储适配器<br/>Storage Adapter
+    
+    FS->>FW: 文件变更事件
+    FW->>IU: on_file_changed(path, type)
+    
+    Note over IU: 去重与防抖<br/>1秒内合并变更
+    
+    IU->>IU: 计算图差异
+    IU->>GB: 重新解析文件
+    GB-->>IU: 新图结构
+    
+    IU->>IU: 对比新旧图
+    IU->>SA: 应用增量更新
+    
+    Note over SA: 原子性事务<br/>保证一致性
+    
+    SA-->>IU: 更新完成
+    IU-->>FW: 处理完成
+```
+
+#### 5.5.2 图差异计算
+
+```python
+class GraphDelta:
+    """图差异表示"""
+    
+    def __init__(self):
+        self.added_nodes: List[Node] = []
+        self.updated_nodes: List[Node] = []
+        self.deleted_nodes: Set[str] = set()
+        self.added_edges: List[Edge] = []
+        self.deleted_edges: Set[Tuple[str, str, str]] = set()
+    
+    def apply_to(self, graph: Graph) -> None:
+        """应用差异到图"""
+        # 删除边和节点
+        for source, target, edge_type in self.deleted_edges:
+            graph.remove_edge(source, target, edge_type)
+        
+        for node_id in self.deleted_nodes:
+            graph.remove_node(node_id)
+        
+        # 添加/更新节点和边
+        for node in self.added_nodes + self.updated_nodes:
+            graph.add_node(node)
+        
+        for edge in self.added_edges:
+            graph.add_edge(edge)
+```
+
+### 5.6 性能优化策略
+
+#### 5.6.1 序列化优化
+
+| 序列化格式 | 大小(KB) | 序列化时间(ms) | 反序列化时间(ms) | 适用场景 |
+|---------|--------|------------|-------------|------|
+| JSON | 850 | 45 | 52 | 调试、可读性要求高 |
+| MessagePack | 520 | 18 | 22 | 生产环境、性能要求高 |
+| Protocol Buffers | 480 | 15 | 19 | 跨语言、版本兼容性 |
+
+**选择策略**：
+- **Redis缓存**：使用MessagePack，平衡性能与兼容性
+- **PostgreSQL存储**：使用JSONB，便于查询与索引
+- **文件导出**：使用JSON，便于人工查看与调试
+
+#### 5.6.2 查询性能优化
+
+```mermaid
+graph LR
+    %% 查询优化策略
+    subgraph QO[查询优化]
+        QO1[索引优化<br/>Index Optimization]
+        QO2[缓存策略<br/>Cache Strategy]
+        QO3[批量操作<br/>Batch Operations]
+        QO4[连接池<br/>Connection Pool]
+    end
+    
+    %% 性能指标
+    subgraph PM[性能指标]
+        PM1[读延迟 < 10ms<br/>Read Latency]
+        PM2[写延迟 < 50ms<br/>Write Latency]
+        PM3[并发 > 100 QPS<br/>Concurrency]
+        PM4[图更新 < 100ms<br/>Graph Update]
+    end
+    
+    QO --> PM
+    
+    style QO fill:#e3f2fd
+    style PM fill:#e8f5e9
+```
+
+---
+
+## 6. 关键技术选型
+
+### 6.1 核心技术栈
 
 | 技术领域    | 选型方案                                 | 选型理由                  |
 | ------- | ------------------------------------ | --------------------- |
 | 编程语言    | Python 3.10+                         | 丰富的生态、优秀的 AI/ML 库支持   |
 | AST 解析  | Tree-sitter\[1]                      | 增量解析、多语言支持、高性能        |
+| 图存储     | Redis + PostgreSQL                   | Redis缓存 + PostgreSQL持久化 |
+| 序列化     | MessagePack + JSON                   | 性能与兼容性平衡            |
 | CLI 框架  | Click\[2]                            | 简洁的 API、丰富的功能、良好的文档   |
 | Web 框架  | FastAPI\[3]                          | 异步支持、自动文档生成、类型验证      |
 | LLM SDK | Anthropic SDK\[4]<br/>OpenAI SDK\[5] | 官方支持、稳定可靠、功能完整        |

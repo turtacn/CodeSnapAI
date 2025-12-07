@@ -1,0 +1,289 @@
+name: Graph Engine Integration Tests
+
+on:
+  push:
+    branches: [ main, master, feat/round7-phase2-graph-storage ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-graph-engine:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: codesage_test
+          POSTGRES_USER: codesage_test
+          POSTGRES_PASSWORD: codesage_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codesage_test -d codesage_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      matrix:
+        python-version: [3.10, 3.11, 3.12]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+    
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+    
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+    
+    - name: Install project
+      run: poetry install --no-interaction
+    
+    - name: Wait for services
+      run: |
+        # Wait for Redis
+        timeout 30 bash -c 'until redis-cli -h localhost -p 6379 ping; do sleep 1; done'
+        
+        # Wait for PostgreSQL
+        timeout 30 bash -c 'until pg_isready -h localhost -p 5432 -U codesage_test; do sleep 1; done'
+    
+    - name: Run unit tests
+      run: |
+        poetry run pytest tests/unit/graph/ -v --cov=codesage.graph --cov-report=xml --cov-report=term-missing
+      env:
+        PYTHONPATH: .
+    
+    - name: Run integration tests
+      run: |
+        poetry run pytest tests/integration/storage/ -v --tb=short
+      env:
+        PYTHONPATH: .
+        # Redis configuration
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        REDIS_DB: 15
+        # PostgreSQL configuration
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_DB: codesage_test
+        POSTGRES_USER: codesage_test
+        POSTGRES_PASSWORD: codesage_test
+    
+    - name: Run performance tests
+      run: |
+        poetry run pytest tests/performance/test_graph_query_perf.py -v --tb=short -s
+      env:
+        PYTHONPATH: .
+    
+    - name: Upload coverage reports
+      if: matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: graph-engine
+        name: graph-engine-coverage
+        fail_ci_if_error: false
+
+  test-graph-scenarios:
+    runs-on: ubuntu-latest
+    needs: test-graph-engine
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: codesage_test
+          POSTGRES_USER: codesage_test
+          POSTGRES_PASSWORD: codesage_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codesage_test -d codesage_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+    
+    - name: Install dependencies
+      run: poetry install --no-interaction
+    
+    - name: Test end-to-end graph pipeline
+      run: |
+        poetry run python -c "
+        import tempfile
+        import os
+        from pathlib import Path
+        
+        from codesage.analyzers.parser_factory import create_parser, detect_language
+        from codesage.graph.graph_builder import GraphBuilder
+        from codesage.graph.storage.redis_impl import RedisStorageAdapter, RedisConfig
+        from codesage.graph.storage.postgres_impl import PostgreSQLStorageAdapter, PostgresConfig
+        from codesage.graph.query.dsl import parse_query
+        from codesage.graph.query.processor import QueryProcessor
+        
+        # Create test Python file
+        test_code = '''
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n-1)
+
+def main():
+    print(fibonacci(10))
+    print(factorial(5))
+
+if __name__ == '__main__':
+    main()
+        '''
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(test_code)
+            test_file = f.name
+        
+        try:
+            # Parse file
+            language = detect_language(test_file)
+            parser = create_parser(language)
+            parser.parse(test_code)
+            parser_output = parser.to_graph_format(test_file)
+            
+            # Build graph
+            builder = GraphBuilder()
+            graph = builder.from_parser_output(parser_output)
+            
+            print(f'Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges')
+            
+            # Test Redis storage
+            redis_config = RedisConfig(host='localhost', port=6379, db=15)
+            redis_adapter = RedisStorageAdapter(redis_config)
+            redis_adapter.save_graph(graph)
+            loaded_graph = redis_adapter.load_graph(list(graph.nodes.keys())[0])
+            print(f'Redis: Saved and loaded graph with {len(loaded_graph.nodes)} nodes')
+            
+            # Test PostgreSQL storage
+            postgres_config = PostgresConfig(
+                host='localhost', port=5432, database='codesage_test',
+                username='codesage_test', password='codesage_test'
+            )
+            postgres_adapter = PostgreSQLStorageAdapter(postgres_config)
+            postgres_adapter.save_graph(graph)
+            loaded_graph = postgres_adapter.load_graph(list(graph.nodes.keys())[0])
+            print(f'PostgreSQL: Saved and loaded graph with {len(loaded_graph.nodes)} nodes')
+            
+            # Test queries
+            processor = QueryProcessor(postgres_adapter)
+            
+            # Query all functions
+            query_ast = parse_query('FIND function')
+            result = processor.execute(query_ast)
+            print(f'Query result: Found {len(result.nodes)} functions')
+            
+            # Query high complexity functions
+            high_complexity = processor.find_high_complexity_functions(threshold=2)
+            print(f'High complexity functions: {len(high_complexity)}')
+            
+            print('✅ End-to-end pipeline test passed!')
+            
+        finally:
+            os.unlink(test_file)
+        "
+      env:
+        PYTHONPATH: .
+    
+    - name: Test incremental updates
+      run: |
+        poetry run python -c "
+        import tempfile
+        import os
+        import time
+        from pathlib import Path
+        
+        from codesage.graph.storage.redis_impl import RedisStorageAdapter, RedisConfig
+        from codesage.graph.graph_builder import GraphBuilder
+        from codesage.graph.incremental.updater import IncrementalUpdater, ChangeType
+        
+        # Setup
+        redis_config = RedisConfig(host='localhost', port=6379, db=15)
+        redis_adapter = RedisStorageAdapter(redis_config)
+        builder = GraphBuilder()
+        updater = IncrementalUpdater(redis_adapter, builder, debounce_interval=0.1)
+        
+        # Create test file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write('def test_func(): pass')
+            test_file = f.name
+        
+        try:
+            # Test file change processing
+            updater.on_file_changed(test_file, ChangeType.CREATE)
+            time.sleep(0.2)  # Wait for debounce
+            
+            # Check statistics
+            stats = updater.get_statistics()
+            print(f'Updater stats: {stats}')
+            
+            print('✅ Incremental update test passed!')
+            
+        finally:
+            os.unlink(test_file)
+        "
+      env:
+        PYTHONPATH: .

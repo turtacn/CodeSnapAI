@@ -1,0 +1,29 @@
+# PostgreSQL Storage Configuration
+postgres:
+  host: "localhost"
+  port: 5432
+  database: "codesage"
+  username: "codesage"
+  password: "codesage"
+  
+  # Connection pool settings
+  pool:
+    size: 20
+    max_overflow: 50
+    pool_timeout: 30
+    pool_recycle: 3600
+    pool_pre_ping: true
+  
+  # Graph-specific settings
+  graph:
+    schema: "public"
+    nodes_table: "nodes"
+    edges_table: "edges"
+    batch_size: 1000
+    max_query_depth: 10
+    
+  # Performance settings
+  performance:
+    enable_gin_indexes: true
+    enable_btree_indexes: true
+    vacuum_analyze: true

@@ -1,0 +1,147 @@
+# Semantic Graph Schema Definition
+schema:
+  version: "1.0"
+  
+  # Node Types
+  node_types:
+    file:
+      description: "Source code file"
+      required_properties:
+        - path
+        - language
+        - loc
+      optional_properties:
+        - encoding
+        - last_modified
+        - size_bytes
+    
+    module:
+      description: "Module or package"
+      required_properties:
+        - name
+        - qualified_name
+      optional_properties:
+        - version
+        - description
+        - exports
+    
+    function:
+      description: "Function or method"
+      required_properties:
+        - name
+        - qualified_name
+        - line_start
+        - line_end
+      optional_properties:
+        - complexity
+        - params
+        - return_type
+        - decorators
+        - docstring
+        - is_async
+        - is_generator
+    
+    class:
+      description: "Class definition"
+      required_properties:
+        - name
+        - qualified_name
+        - line_start
+        - line_end
+      optional_properties:
+        - base_classes
+        - methods
+        - attributes
+        - decorators
+        - docstring
+        - is_abstract
+    
+    variable:
+      description: "Variable or constant"
+      required_properties:
+        - name
+        - qualified_name
+      optional_properties:
+        - type_hint
+        - value
+        - is_constant
+        - scope
+  
+  # Edge Types
+  edge_types:
+    contains:
+      description: "Container relationship (file contains function)"
+      source_types: ["file", "module", "class"]
+      target_types: ["function", "class", "variable", "module"]
+      properties:
+        - line_number
+    
+    calls:
+      description: "Function call relationship"
+      source_types: ["function"]
+      target_types: ["function"]
+      properties:
+        - call_site
+        - call_type  # direct, indirect, dynamic
+        - arguments
+    
+    inherits:
+      description: "Class inheritance relationship"
+      source_types: ["class"]
+      target_types: ["class"]
+      properties:
+        - inheritance_type  # single, multiple
+    
+    imports:
+      description: "Import relationship"
+      source_types: ["file", "module"]
+      target_types: ["module", "function", "class"]
+      properties:
+        - import_type  # from, import, relative
+        - alias
+        - line_number
+    
+    references:
+      description: "Variable reference relationship"
+      source_types: ["function", "class"]
+      target_types: ["variable", "function", "class"]
+      properties:
+        - reference_type  # read, write, call
+        - line_number
+    
+    defines:
+      description: "Definition relationship"
+      source_types: ["function", "class", "file"]
+      target_types: ["variable"]
+      properties:
+        - definition_type  # local, global, parameter
+        - line_number
+
+  # Validation Rules
+  validation:
+    max_node_properties: 50
+    max_edge_properties: 20
+    max_qualified_name_length: 500
+    required_node_id_format: "^[a-zA-Z0-9_:/.\\-]+$"
+    
+  # Query Patterns
+  query_patterns:
+    - name: "find_functions_calling"
+      description: "Find all functions that call a specific function"
+      pattern: "FIND functions WHERE CALLING '{target}'"
+    
+    - name: "get_class_hierarchy"
+      description: "Get inheritance hierarchy for a class"
+      pattern: "FIND classes WHERE INHERITS '{base_class}' DEPTH {max_depth}"
+    
+    - name: "find_file_dependencies"
+      description: "Find all files that import from a specific module"
+      pattern: "FIND files WHERE IMPORTS '{module}'"
+    
+    - name: "get_function_complexity"
+      description: "Find functions with complexity above threshold"
+      pattern: "FIND functions WHERE complexity > {threshold}"
+    
+    - name: "find_unused_functions"
+      description: "Find functions that are never called"
+      pattern: "FIND functions WHERE NOT EXISTS (FIND * WHERE CALLING this)"
