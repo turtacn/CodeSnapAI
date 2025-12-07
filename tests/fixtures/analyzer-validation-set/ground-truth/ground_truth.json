@@ -1,0 +1,308 @@
+{
+  "python": {
+    "complex_nested_async.py": {
+      "expected_functions": [
+        {
+          "name": "outer_async_function",
+          "is_async": true,
+          "line": 6,
+          "parent_scope": null,
+          "nested_functions": [
+            {
+              "name": "inner_async_processor",
+              "is_async": true,
+              "line": 9,
+              "parent_scope": "outer_async_function"
+            },
+            {
+              "name": "inner_async_validator",
+              "is_async": true,
+              "line": 13,
+              "parent_scope": "outer_async_function"
+            },
+            {
+              "name": "sync_helper",
+              "is_async": false,
+              "line": 17,
+              "parent_scope": "outer_async_function"
+            }
+          ]
+        },
+        {
+          "name": "regular_function_with_nested_async",
+          "is_async": false,
+          "line": 29,
+          "parent_scope": null,
+          "nested_functions": [
+            {
+              "name": "nested_async_in_sync",
+              "is_async": true,
+              "line": 32,
+              "parent_scope": "regular_function_with_nested_async"
+            }
+          ]
+        },
+        {
+          "name": "process_data",
+          "is_async": true,
+          "line": 42,
+          "parent_scope": null,
+          "nested_functions": [
+            {
+              "name": "process_item",
+              "is_async": true,
+              "line": 45,
+              "parent_scope": "process_data"
+            }
+          ]
+        }
+      ],
+      "expected_classes": [
+        {
+          "name": "AsyncProcessor",
+          "line": 37,
+          "methods": ["process_data"]
+        }
+      ]
+    },
+    "match_statements_3_10.py": {
+      "expected_functions": [
+        {
+          "name": "process_data",
+          "complexity": 10,
+          "match_cases": 9
+        },
+        {
+          "name": "complex_match_with_guards",
+          "complexity": 7,
+          "match_cases": 6
+        },
+        {
+          "name": "nested_match_statements",
+          "complexity": 8,
+          "nested_match": true
+        }
+      ],
+      "expected_classes": [
+        {
+          "name": "DataProcessor",
+          "methods": ["process_request", "_create_item", "_update_item", "_delete_item", "_list_items"]
+        }
+      ]
+    },
+    "error_recovery.py": {
+      "expected_functions": [
+        {
+          "name": "valid_function",
+          "should_parse": true
+        },
+        {
+          "name": "another_valid_function",
+          "should_parse": true
+        },
+        {
+          "name": "final_valid_function",
+          "should_parse": true
+        }
+      ],
+      "expected_classes": [
+        {
+          "name": "ValidClass",
+          "methods": ["method_one", "method_two"]
+        }
+      ],
+      "parsing_errors": true,
+      "partial_ast": true
+    }
+  },
+  "go": {
+    "generic_constraints.go": {
+      "expected_functions": [
+        {
+          "name": "Add",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "T",
+              "constraint": "constraints.Ordered"
+            }
+          ]
+        },
+        {
+          "name": "Transform",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "T",
+              "constraint": "any"
+            },
+            {
+              "name": "U",
+              "constraint": "any"
+            }
+          ]
+        },
+        {
+          "name": "Sum",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "T",
+              "constraint": "Numeric"
+            }
+          ]
+        },
+        {
+          "name": "NewCache",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "K",
+              "constraint": "comparable"
+            },
+            {
+              "name": "V",
+              "constraint": "any"
+            }
+          ]
+        }
+      ],
+      "expected_structs": [
+        {
+          "name": "Container",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "T",
+              "constraint": "any"
+            }
+          ]
+        },
+        {
+          "name": "Cache",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "K",
+              "constraint": "comparable"
+            },
+            {
+              "name": "V",
+              "constraint": "any"
+            }
+          ]
+        },
+        {
+          "name": "Result",
+          "is_generic": true,
+          "type_parameters": [
+            {
+              "name": "T",
+              "constraint": "any"
+            },
+            {
+              "name": "E",
+              "constraint": "error"
+            }
+          ]
+        }
+      ]
+    },
+    "struct_tags.go": {
+      "expected_structs": [
+        {
+          "name": "User",
+          "fields": [
+            {
+              "name": "ID",
+              "type": "int",
+              "tags": "json:\"id\" db:\"user_id\" validate:\"required\""
+            },
+            {
+              "name": "Name",
+              "type": "string",
+              "tags": "json:\"name\" db:\"full_name\" validate:\"required,min=2,max=50\""
+            },
+            {
+              "name": "Email",
+              "type": "string",
+              "tags": "json:\"email\" db:\"email_address\" validate:\"required,email\""
+            }
+          ]
+        },
+        {
+          "name": "Profile",
+          "embedded_fields": ["User"],
+          "fields": [
+            {
+              "name": "Bio",
+              "tags": "json:\"bio,omitempty\" db:\"biography\""
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "java": {
+    "records.java": {
+      "expected_records": [
+        {
+          "name": "Person",
+          "components": ["String name", "int age"],
+          "methods": ["Person", "isAdult"],
+          "static_methods": ["createChild"]
+        },
+        {
+          "name": "Container",
+          "is_generic": true,
+          "components": ["T value", "String label"],
+          "methods": ["isEmpty"]
+        },
+        {
+          "name": "User",
+          "implements": ["Identifiable"],
+          "components": ["String id", "String username", "String email"],
+          "methods": ["getId", "getDisplayName"]
+        }
+      ],
+      "expected_classes": [
+        {
+          "name": "OrderService",
+          "nested_records": ["OrderItem", "Order"]
+        }
+      ]
+    },
+    "annotations.java": {
+      "expected_classes": [
+        {
+          "name": "UserController",
+          "annotations": ["@RestController", "@RequestMapping", "@CrossOrigin", "@Validated"],
+          "semantic_tags": ["controller"]
+        },
+        {
+          "name": "User",
+          "annotations": ["@Entity", "@Table"],
+          "semantic_tags": ["db_op"]
+        },
+        {
+          "name": "UserService",
+          "annotations": ["@Service", "@Transactional"],
+          "semantic_tags": ["service"]
+        }
+      ],
+      "expected_functions": [
+        {
+          "name": "getUser",
+          "annotations": ["@GetMapping", "@ApiOperation", "@Timed"],
+          "semantic_tags": ["network"],
+          "nested_annotations": true
+        },
+        {
+          "name": "createUser",
+          "annotations": ["@PostMapping", "@ApiOperation", "@Timed"],
+          "semantic_tags": ["network"]
+        }
+      ]
+    }
+  }
+}

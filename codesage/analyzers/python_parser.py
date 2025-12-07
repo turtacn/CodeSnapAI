@@ -4,6 +4,7 @@ from codesage.analyzers.base import BaseParser
 from codesage.analyzers.ast_models import FunctionNode, ClassNode, ImportNode, VariableNode
 from codesage.snapshot.models import ASTSummary, ComplexityMetrics
 from typing import List, Set
+from functools import lru_cache
 
 PY_COMPLEXITY_NODES = {
     "if_statement",
@@ -44,14 +45,27 @@ class PythonParser(BaseParser):
         self.parser = Parser(py_language)
 
     def _parse(self, source_code: bytes):
-        return self.parser.parse(source_code)
+        try:
+            tree = self.parser.parse(source_code)
+            # Check for parsing errors and attempt recovery
+            if tree and tree.root_node.has_error:
+                # Log parsing errors but continue with partial AST
+                print(f"Warning: Parsing errors detected, continuing with partial AST")
+            return tree
+        except Exception as e:
+            print(f"Error parsing source code: {e}")
+            # Return None to indicate parsing failure
+            return None
 
     def extract_functions(self) -> List[FunctionNode]:
         functions = []
         if not self.tree:
             return functions
 
-        for node in self._walk(self.tree.root_node):
+        # Use a stack to track scope chain for nested functions
+        scope_stack = []
+        
+        def _extract_functions_recursive(node, parent_scope=None):
             if node.type in ("function_definition", "async_function_definition"):
                 # Check if the function is inside a class
                 parent = node.parent
@@ -60,8 +74,22 @@ class PythonParser(BaseParser):
                         break
                     parent = parent.parent
                 else:
-                    functions.append(self._build_function_node(node))
-
+                    func = self._build_function_node(node)
+                    # Update parent_scope using model_copy to avoid Pydantic validation issues
+                    func = func.model_copy(update={'parent_scope': parent_scope})
+                    functions.append(func)
+                    
+                    # Recursively process nested functions
+                    body = node.child_by_field_name("body")
+                    if body:
+                        for child in body.children:
+                            _extract_functions_recursive(child, func.name)
+            else:
+                # Continue traversing for other node types
+                for child in node.children:
+                    _extract_functions_recursive(child, parent_scope)
+        
+        _extract_functions_recursive(self.tree.root_node)
         return functions
 
     def extract_classes(self) -> List[ClassNode]:
@@ -271,15 +299,36 @@ class PythonParser(BaseParser):
             if type_text:
                 return_type = f"-> {type_text}"
 
+        # Extract parameters with better handling of *args, **kwargs, and type annotations
+        params = []
+        if params_node:
+            for param in params_node.children:
+                if param.type in ("identifier", "typed_parameter", "default_parameter", 
+                                "typed_default_parameter", "list_splat_pattern", "dictionary_splat_pattern"):
+                    param_text = self._text(param)
+                    # Handle type annotations for parameters
+                    if param.type == "typed_parameter":
+                        # Extract parameter name and type
+                        param_name = None
+                        param_type = None
+                        for child in param.children:
+                            if child.type == "identifier":
+                                param_name = self._text(child)
+                            elif child.type in ("type", "generic_type", "union_type"):
+                                param_type = self._text(child)
+                        if param_name and param_type:
+                            param_text = f"{param_name}: {param_type}"
+                    params.append(param_text)
+
         # Analyze function body for tags
         tags = self._extract_tags(func_node)
 
         is_exported = not name.startswith("_")
 
-        return FunctionNode(
+        func = FunctionNode(
             node_type="function",
             name=name,
-            params=[self._text(param) for param in params_node.children] if params_node else [],
+            params=params,
             return_type=return_type,
             start_line=func_node.start_point[0],
             end_line=func_node.end_point[0],
@@ -287,8 +336,11 @@ class PythonParser(BaseParser):
             is_async=is_async,
             decorators=decorators,
             tags=tags,
-            is_exported=is_exported
+            is_exported=is_exported,
+            parent_scope=None  # Will be set by caller
         )
+        
+        return func
 
     def _extract_tags(self, node: Node) -> Set[str]:
         tags = set()
@@ -325,11 +377,24 @@ class PythonParser(BaseParser):
         return decorators
 
     def calculate_complexity(self, node: Node) -> int:
+        """Calculate cyclomatic complexity with caching and Python 3.10+ match support"""
         complexity = 1
 
         for child in self._walk(node):
             if child.type in PY_COMPLEXITY_NODES:
                 complexity += 1
+            elif child.type == "match_statement":
+                # Handle Python 3.10+ match statements
+                case_count = 0
+                for grandchild in child.children:
+                    if grandchild.type == "case_clause":
+                        case_count += 1
+                complexity += case_count
+            elif child.type == "binary_expression":
+                # Handle logical operators that add complexity
+                operator = child.child_by_field_name("operator")
+                if operator and self._text(operator) in ("and", "or"):
+                    complexity += 1
 
         return complexity
 

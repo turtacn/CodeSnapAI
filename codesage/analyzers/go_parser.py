@@ -144,17 +144,37 @@ class GoParser(BaseParser):
         if result_node:
              return_type = self._text(result_node)
 
+        # Extract type parameters for generics (Go 1.18+)
+        type_parameters = []
         is_generic = type_params_node is not None
+        if type_params_node:
+            for param in type_params_node.children:
+                if param.type == "type_parameter_declaration":
+                    param_name = None
+                    param_constraint = None
+                    for child in param.children:
+                        if child.type == "type_identifier":
+                            param_name = self._text(child)
+                        elif child.type in ("type_constraint", "type_term"):
+                            param_constraint = self._text(child)
+                    
+                    if param_name:
+                        type_parameters.append({
+                            'name': param_name,
+                            'constraint': param_constraint or 'any'
+                        })
 
         # Determine exported
         func_name = self._text(name_node) if name_node else ''
         is_exported = func_name[0].isupper() if func_name else False
 
-        decorators = ["generic"] if is_generic else []
+        decorators = []
+        if is_generic:
+            decorators.append("generic")
         if is_exported:
             decorators.append("exported")
 
-        return FunctionNode(
+        func = FunctionNode(
             node_type="function",
             name=func_name,
             params=params,
@@ -166,6 +186,11 @@ class GoParser(BaseParser):
             is_async=False,
             decorators=decorators
         )
+        
+        # Add type parameters as custom attribute
+        func.type_parameters = type_parameters
+        
+        return func
 
     # ----------------------------------------------------------------------
     # Struct extraction
@@ -196,6 +221,26 @@ class GoParser(BaseParser):
     def _build_struct_node(self, type_spec_node) -> ClassNode:
         name_node = type_spec_node.child_by_field_name("name")
         struct_type = type_spec_node.child_by_field_name("type")
+        
+        # Check for type parameters (generics)
+        type_params_node = type_spec_node.child_by_field_name("type_parameters")
+        type_parameters = []
+        if type_params_node:
+            for param in type_params_node.children:
+                if param.type == "type_parameter_declaration":
+                    param_name = None
+                    param_constraint = None
+                    for child in param.children:
+                        if child.type == "type_identifier":
+                            param_name = self._text(child)
+                        elif child.type in ("type_constraint", "type_term"):
+                            param_constraint = self._text(child)
+                    
+                    if param_name:
+                        type_parameters.append({
+                            'name': param_name,
+                            'constraint': param_constraint or 'any'
+                        })
 
         fields = []
         if struct_type:
@@ -210,6 +255,12 @@ class GoParser(BaseParser):
                     if child.type == "field_declaration":
                         type_node = child.child_by_field_name("type")
                         type_str = self._text(type_node) if type_node else None
+                        
+                        # Extract struct tags (e.g., `json:"name"`)
+                        tag_str = None
+                        tag_node = child.child_by_field_name("tag")
+                        if tag_node:
+                            tag_str = self._text(tag_node)
 
                         names = []
                         for sub in child.children:
@@ -224,31 +275,42 @@ class GoParser(BaseParser):
                                 field_name_for_exported = type_str.lstrip("*")
                                 is_exported_field = field_name_for_exported[0].isupper() if field_name_for_exported else False
 
-                                fields.append(VariableNode(
+                                field = VariableNode(
                                     node_type="variable",
                                     name=type_str,
                                     type_name=type_str,
                                     kind="embedded_field",
                                     is_exported=is_exported_field
-                                ))
+                                )
+                                if tag_str:
+                                    field.struct_tag = tag_str
+                                fields.append(field)
                         else:
                             for n in names:
                                 is_exported_field = n[0].isupper() if n else False
-                                fields.append(VariableNode(
+                                field = VariableNode(
                                     node_type="variable",
                                     name=n,
                                     type_name=type_str,
                                     kind="field",
                                     is_exported=is_exported_field
-                                ))
+                                )
+                                if tag_str:
+                                    field.struct_tag = tag_str
+                                fields.append(field)
 
-        return ClassNode(
+        struct = ClassNode(
             node_type="struct",
             name=self._text(name_node) if name_node else "<anonymous>",
             fields=fields,
             methods=[],
             base_classes=[]
         )
+        
+        # Add type parameters as custom attribute
+        struct.type_parameters = type_parameters
+        
+        return struct
 
     # ----------------------------------------------------------------------
     # Interface extraction

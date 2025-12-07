@@ -1,0 +1,223 @@
+name: Analyzer Test Suite
+
+on:
+  push:
+    branches: [ main, master, feat/round7-phase1-analyzer-stabilization ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.10, 3.11, 3.12]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+
+    - name: Install project
+      run: poetry install --no-interaction
+
+    - name: Run analyzer unit tests with coverage
+      run: |
+        poetry run pytest tests/unit/analyzers/ \
+          --cov=codesage/analyzers \
+          --cov-report=xml \
+          --cov-report=html \
+          --cov-report=term-missing \
+          --cov-fail-under=95 \
+          -v
+
+    - name: Run performance tests
+      run: |
+        poetry run pytest tests/performance/ \
+          --benchmark-only \
+          --benchmark-sort=mean \
+          --benchmark-min-rounds=3 \
+          -v
+
+    - name: Run ground truth validation
+      run: |
+        poetry run pytest tests/unit/analyzers/test_ground_truth_validation.py \
+          -v
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: analyzers
+        name: codecov-umbrella
+        fail_ci_if_error: true
+
+    - name: Upload coverage HTML report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report-${{ matrix.python-version }}
+        path: htmlcov/
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: benchmark-results-${{ matrix.python-version }}
+        path: .benchmarks/
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Install dependencies
+      run: poetry install --no-interaction
+
+    - name: Run integration tests
+      run: |
+        poetry run pytest tests/integration/ \
+          -k "analyzer or parser" \
+          --tb=short \
+          -v
+
+    - name: Test analyzer CLI commands
+      run: |
+        # Test Python analysis
+        echo "def test_function(): pass" > test_file.py
+        poetry run codesage analyze test_file.py --format json
+        
+        # Test Go analysis (if Go files exist)
+        if [ -f "*.go" ]; then
+          poetry run codesage analyze *.go --format json
+        fi
+        
+        # Test Java analysis (if Java files exist)
+        if [ -f "*.java" ]; then
+          poetry run codesage analyze *.java --format json
+        fi
+
+  quality-check:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Install dependencies
+      run: poetry install --no-interaction
+
+    - name: Run code quality checks
+      run: |
+        # Check analyzer code quality
+        poetry run ruff check codesage/analyzers/
+        poetry run black --check codesage/analyzers/
+        
+        # Check test code quality
+        poetry run ruff check tests/unit/analyzers/
+        poetry run black --check tests/unit/analyzers/
+
+    - name: Check analyzer performance benchmarks
+      run: |
+        # Run performance tests and check they meet requirements
+        poetry run pytest tests/performance/ \
+          --benchmark-only \
+          --benchmark-json=benchmark_results.json
+        
+        # Verify performance requirements are met
+        python -c "
+        import json
+        with open('benchmark_results.json') as f:
+            data = json.load(f)
+        
+        for benchmark in data['benchmarks']:
+            if '1000_loc' in benchmark['name']:
+                mean_time = benchmark['stats']['mean']
+                assert mean_time < 0.5, f'Performance requirement failed: {benchmark[\"name\"]} took {mean_time:.3f}s > 0.5s'
+                print(f'✓ {benchmark[\"name\"]}: {mean_time:.3f}s')
+        "
+
+  documentation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Install dependencies
+      run: poetry install --no-interaction
+
+    - name: Generate test report
+      run: |
+        # Generate comprehensive test report
+        poetry run pytest tests/unit/analyzers/ \
+          --cov=codesage/analyzers \
+          --cov-report=html \
+          --html=docs/phase1-test-report.html \
+          --self-contained-html \
+          -v
+
+    - name: Upload test report
+      uses: actions/upload-artifact@v3
+      with:
+        name: phase1-test-report
+        path: docs/phase1-test-report.html

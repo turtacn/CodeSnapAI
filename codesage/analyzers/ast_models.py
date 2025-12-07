@@ -16,6 +16,7 @@ class VariableNode(ASTNode):
     kind: str = "global"  # global, local, field (for structs)
     type_name: Optional[str] = None # For typed variables (Go)
     is_exported: bool = False
+    struct_tag: Optional[str] = None  # For Go struct tags
 
 class FunctionNode(ASTNode):
     name: str
@@ -29,6 +30,13 @@ class FunctionNode(ASTNode):
     cyclomatic_complexity: int = 1
     cognitive_complexity: int = 0
     is_exported: bool = False
+    parent_scope: Optional[str] = None  # For nested functions
+    type_parameters: List[dict] = Field(default_factory=list)  # For generic functions
+    throws_clause: List[str] = Field(default_factory=list)  # For Java throws
+    is_synchronized: bool = False  # For Java synchronized methods
+    is_static: bool = False  # For static methods
+    is_record_constructor: bool = False  # For Java record constructors
+    record_components: List[str] = Field(default_factory=list)  # For Java record components
 
 class ClassNode(ASTNode):
     name: str
@@ -36,6 +44,7 @@ class ClassNode(ASTNode):
     fields: List[VariableNode] = Field(default_factory=list) # For structs
     base_classes: List[str] = Field(default_factory=list)
     is_exported: bool = False
+    type_parameters: List[dict] = Field(default_factory=list)  # For generic classes/structs
 
 class ImportNode(ASTNode):
     path: str

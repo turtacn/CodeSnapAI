@@ -81,9 +81,21 @@ class JavaParser(BaseParser):
 
         for node in self._walk(self.tree.root_node):
             if node.type in ("method_declaration", "constructor_declaration"):
+                # Skip lambda expressions which might be misidentified
+                if self._is_lambda_expression(node):
+                    continue
                 functions.append(self._build_function_node(node))
 
         return functions
+    
+    def _is_lambda_expression(self, node) -> bool:
+        """Check if a node is part of a lambda expression"""
+        parent = node.parent
+        while parent:
+            if parent.type == "lambda_expression":
+                return True
+            parent = parent.parent
+        return False
 
     def extract_classes(self) -> List[ClassNode]:
         classes = []
@@ -203,15 +215,37 @@ class JavaParser(BaseParser):
     def _build_function_node(self, func_node):
         name_node = func_node.child_by_field_name("name")
         name = self._text(name_node) if name_node else ''
+        
+        # Check if this is a record constructor
+        is_record_constructor = False
+        record_components = []
         if func_node.type == "constructor_declaration":
-            # Constructor name matches class name, usually available as name field
-            pass
+            parent = func_node.parent
+            while parent:
+                if parent.type == "record_declaration":
+                    is_record_constructor = True
+                    # Extract record components
+                    params_list = parent.child_by_field_name("parameters")
+                    if params_list:
+                        for param in params_list.children:
+                            if param.type == "formal_parameter":
+                                record_components.append(self._text(param))
+                    break
+                parent = parent.parent
 
         params_node = func_node.child_by_field_name("parameters")
         return_type_node = func_node.child_by_field_name("type") # return type
 
         modifiers_node = func_node.child_by_field_name("modifiers")
         decorators = self._get_annotations(modifiers_node)
+        
+        # Extract throws clause
+        throws_clause = []
+        throws_node = func_node.child_by_field_name("throws")
+        if throws_node:
+            for child in throws_node.children:
+                if child.type in ("type_identifier", "scoped_identifier"):
+                    throws_clause.append(self._text(child))
 
         return_type = None
         if return_type_node:
@@ -229,13 +263,20 @@ class JavaParser(BaseParser):
             if ann_name in ANNOTATION_TAGS:
                 tags.add(ANNOTATION_TAGS[ann_name])
 
+        # Check modifiers for visibility and other attributes
         is_exported = False
+        is_synchronized = False
+        is_static = False
         if modifiers_node:
             for child in modifiers_node.children:
                 if child.type == "public" or child.type == "protected":
                     is_exported = True
+                elif child.type == "synchronized":
+                    is_synchronized = True
+                elif child.type == "static":
+                    is_static = True
 
-        return FunctionNode(
+        func = FunctionNode(
             node_type="function",
             name=name,
             params=[self._text(param) for param in params_node.children if param.type == "formal_parameter"] if params_node else [],
@@ -248,6 +289,15 @@ class JavaParser(BaseParser):
             tags=tags,
             is_exported=is_exported
         )
+        
+        # Add Java-specific attributes
+        func.is_record_constructor = is_record_constructor
+        func.record_components = record_components
+        func.throws_clause = throws_clause
+        func.is_synchronized = is_synchronized
+        func.is_static = is_static
+        
+        return func
 
     def _extract_tags(self, node: Node) -> Set[str]:
         tags = set()
@@ -266,10 +316,14 @@ class JavaParser(BaseParser):
 
         annotations = []
         for child in modifiers_node.children:
-            if child.type in ("marker_annotation", "annotation", "modifiers"): # 'modifiers' shouldn't be child of modifiers
-                # Check for annotation types
-                if "annotation" in child.type:
-                     annotations.append(self._text(child))
+            if child.type in ("marker_annotation", "annotation", "normal_annotation"):
+                # Handle different annotation types including nested ones
+                annotation_text = self._text(child)
+                annotations.append(annotation_text)
+            elif child.type == "modifiers":
+                # Recursively handle nested modifiers
+                nested_annotations = self._get_annotations(child)
+                annotations.extend(nested_annotations)
         return annotations
 
     def calculate_complexity(self, node: Node) -> int:
